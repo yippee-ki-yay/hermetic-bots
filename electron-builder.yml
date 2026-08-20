@@ -1,0 +1,18 @@
+# Packaging: electron-builder (chosen over Forge; documented per spec §11.1)
+appId: com.hrokbots.hermesbots
+productName: Hermes Bots
+directories:
+  output: release
+files:
+  - out/**/*
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Signing/notarization configured at release time; no credentials are bundled.
+  identity: null
+npmRebuild: false

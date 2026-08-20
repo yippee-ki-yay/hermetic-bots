@@ -1,0 +1,40 @@
+{
+  "name": "hermes-bots",
+  "productName": "Hermes Bots",
+  "version": "0.1.0",
+  "description": "Private desktop control room for persistent Hermes Agent personas over an SSH tunnel",
+  "main": "out/main/index.js",
+  "private": true,
+  "author": "yippee-ki-yay@users.noreply.github.com",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mock-server": "node tests/mock/hermes-mock-server.mjs",
+    "package": "electron-vite build && electron-builder --mac --config electron-builder.yml"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "ws": "^8.21.3",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.11"
+  }
+}
