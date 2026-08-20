@@ -79,6 +79,14 @@ export class AppController {
   private threads = new Map<string, ThreadSummary[]>();
   private transcripts = new Map<string, TranscriptEvent[]>();
   private sessionProfile = new Map<string, string>();
+  /**
+   * Hermes uses two ids per conversation: the durable one REST reports (e.g.
+   * `20260820_174503_01c16a`) and a short in-memory gateway handle minted on
+   * create/resume (e.g. `04b7e762`). The app keys everything by the durable
+   * id and translates only when talking to the WebSocket.
+   */
+  private gatewayIdByStored = new Map<string, string>();
+  private storedIdByGateway = new Map<string, string>();
   private activeSessionId: string | null = null;
   private pendingPrompts = new Map<string, PendingPrompt>();
   /** Approvals / prompts already answered — exactly-once guard (spec §6.6). */
@@ -558,15 +566,80 @@ export class AppController {
     return events;
   }
 
+  /**
+   * Make a thread the gateway's live session.
+   *
+   * `session.activate` only works for sessions the gateway already holds in
+   * memory; a thread restored from history has to be resumed off disk first,
+   * or every later prompt.submit fails with "session not found". We pass
+   * `omit_messages` because the transcript is hydrated over REST in parallel —
+   * the gateway would otherwise replay the whole conversation at us.
+   */
   async activateSession(profileName: string, sessionId: string): Promise<void> {
     this.activeSessionId = sessionId;
     this.sessionProfile.set(sessionId, profileName);
-    if (this.ws.connected) {
-      try {
-        await this.ws.call('session.activate', { session_id: sessionId, profile: profileName });
-      } catch (err) {
-        log.warn('ws', `session.activate failed: ${toPublicError(err).message}`);
+    if (!this.ws.connected) return;
+
+    const live = await this.liveSessionIds();
+    const known = this.gatewayIdByStored.get(sessionId);
+    const alreadyLive = (known && live.has(known)) || live.has(sessionId);
+    try {
+      if (alreadyLive) {
+        const handle = known && live.has(known) ? known : sessionId;
+        await this.ws.call('session.activate', { session_id: handle, profile: profileName });
+        this.bindSessionIds(sessionId, handle);
+      } else {
+        // Resuming mints a fresh gateway handle for the stored conversation;
+        // everything afterwards must address that handle, not the stored id.
+        const result = await this.ws.call<Record<string, unknown>>('session.resume', {
+          session_id: sessionId,
+          profile: profileName,
+          omit_messages: true,
+        });
+        const handle = result && typeof result === 'object' ? result.session_id : undefined;
+        this.bindSessionIds(sessionId, handle ? String(handle) : undefined);
       }
+    } catch (err) {
+      log.warn('ws', `activating session failed: ${toPublicError(err).message}`);
+    }
+  }
+
+  private bindSessionIds(storedId: string, gatewayId: string | undefined): void {
+    if (!gatewayId) return;
+    this.gatewayIdByStored.set(storedId, gatewayId);
+    this.storedIdByGateway.set(gatewayId, storedId);
+  }
+
+  /** Translate a durable session id to the handle the gateway expects. */
+  private wsId(storedId: string): string {
+    return this.gatewayIdByStored.get(storedId) ?? storedId;
+  }
+
+  /** Translate an id seen on the wire back to the durable one the UI uses. */
+  private storedId(anyId: string): string {
+    return this.storedIdByGateway.get(anyId) ?? anyId;
+  }
+
+  /** Ids the gateway currently holds in memory (tolerant of response shape). */
+  private async liveSessionIds(): Promise<Set<string>> {
+    try {
+      const result = await this.ws.call<unknown>('session.active_list', {});
+      const rows = Array.isArray(result)
+        ? result
+        : result && typeof result === 'object'
+          ? ((result as { sessions?: unknown[] }).sessions ?? [])
+          : [];
+      const ids = new Set<string>();
+      for (const row of rows) {
+        if (typeof row === 'string') ids.add(row);
+        else if (row && typeof row === 'object') {
+          const id = (row as Record<string, unknown>).session_id ?? (row as Record<string, unknown>).id;
+          if (id !== undefined && id !== null) ids.add(String(id));
+        }
+      }
+      return ids;
+    } catch {
+      return new Set();
     }
   }
 
@@ -586,6 +659,16 @@ export class AppController {
     const profileName = this.sessionProfile.get(sessionId);
     // Prefer the gateway RPC (it knows about live sessions and refuses to
     // delete one mid-run); fall back to REST on older builds.
+    // Hermes refuses to delete a session the gateway still holds open, so
+    // release the handle first; deletion then targets the durable row.
+    const handleToClose = this.gatewayIdByStored.get(sessionId);
+    if (handleToClose) {
+      try {
+        await this.ws.call('session.close', { session_id: handleToClose });
+      } catch {
+        /* already closed or unsupported — deletion below still reports truth */
+      }
+    }
     try {
       await this.ws.call('session.delete', { session_id: sessionId, profile: profileName });
     } catch {
@@ -593,12 +676,15 @@ export class AppController {
     }
     this.transcripts.delete(sessionId);
     this.sessionProfile.delete(sessionId);
+    const handle = this.gatewayIdByStored.get(sessionId);
+    if (handle) this.storedIdByGateway.delete(handle);
+    this.gatewayIdByStored.delete(sessionId);
     if (profileName) await this.refreshThreads(profileName);
   }
 
   async branchSession(sessionId: string): Promise<string | null> {
     const result = await this.ws.call<Record<string, unknown>>('session.branch', {
-      session_id: sessionId,
+      session_id: this.wsId(sessionId),
     });
     const newId = result && typeof result === 'object' ? String(result.session_id ?? result.id ?? '') : '';
     const profileName = this.sessionProfile.get(sessionId);
@@ -622,13 +708,18 @@ export class AppController {
       const created = await this.ws.call<Record<string, unknown>>('session.create', {
         profile: input.profileName,
       });
-      sessionId = String(created?.session_id ?? created?.id ?? '');
+      const gatewayId = String(created?.session_id ?? created?.id ?? '');
+      // Prefer the durable id so the thread keeps working after a restart;
+      // fall back to the gateway handle on builds that omit it.
+      sessionId = String(created?.stored_session_id ?? '') || gatewayId;
       if (!sessionId) {
         throw new AppError(
           publicError('hermes/schema-mismatch', 'Session not created', 'Hermes did not return a session id.', true),
         );
       }
+      this.bindSessionIds(sessionId, gatewayId || sessionId);
       this.sessionProfile.set(sessionId, input.profileName);
+      this.activeSessionId = sessionId;
       const thread: ThreadSummary = {
         id: sessionId,
         profileName: input.profileName,
@@ -671,7 +762,7 @@ export class AppController {
     const method = input.mode === 'background' ? 'prompt.background' : 'prompt.submit';
     try {
       await this.ws.call(method, {
-        session_id: sessionId,
+        session_id: this.wsId(sessionId),
         profile: input.profileName,
         request_id: input.requestId,
         text: input.text,
@@ -695,7 +786,7 @@ export class AppController {
   }
 
   async interrupt(sessionId: string): Promise<void> {
-    await this.ws.call('session.interrupt', { session_id: sessionId });
+    await this.ws.call('session.interrupt', { session_id: this.wsId(sessionId) });
   }
 
   /**
@@ -763,7 +854,7 @@ export class AppController {
     // v0.20.x contract: choice is one of the payload's `choices`
     // ("once"/"session"/"always"/"deny"); we only ever grant once.
     await this.ws.call('approval.respond', {
-      session_id: sessionId,
+      session_id: this.wsId(sessionId),
       request_id: requestId,
       choice: approve ? 'once' : 'deny',
     });
@@ -773,7 +864,7 @@ export class AppController {
   async respondClarify(sessionId: string, requestId: string, answer: string): Promise<void> {
     this.assertNotAnswered(requestId);
     await this.ws.call('clarify.respond', {
-      session_id: sessionId,
+      session_id: this.wsId(sessionId),
       request_id: requestId,
       answer,
     });
@@ -785,7 +876,7 @@ export class AppController {
     this.assertNotAnswered(requestId);
     if (password) registerSecret(password); // never allow it into logs
     await this.ws.call('sudo.respond', {
-      session_id: sessionId,
+      session_id: this.wsId(sessionId),
       request_id: requestId,
       password,
     });
@@ -797,7 +888,7 @@ export class AppController {
     if (!cancelled && value) registerSecret(value); // never allow it into logs
     // v0.20.x contract: {request_id, value}; empty value cancels.
     await this.ws.call('secret.respond', {
-      session_id: sessionId,
+      session_id: this.wsId(sessionId),
       request_id: requestId,
       value: cancelled ? '' : value,
     });
@@ -833,16 +924,9 @@ export class AppController {
     await this.reconcilePendingPrompts();
     if (this.activeSessionId) {
       const profileName = this.sessionProfile.get(this.activeSessionId);
-      if (profileName) {
-        try {
-          await this.ws.call('session.activate', {
-            session_id: this.activeSessionId,
-            profile: profileName,
-          });
-        } catch {
-          /* method may not exist; events may still arrive */
-        }
-      }
+      // Re-bind the visible thread after a reconnect; the gateway may have
+      // dropped it from memory while we were away.
+      if (profileName) await this.activateSession(profileName, this.activeSessionId);
     }
   }
 
@@ -866,7 +950,9 @@ export class AppController {
 
   private onGatewayEvent(raw: Record<string, unknown>): void {
     const normalized = normalizeFrame(raw, (sessionId) => {
-      const sid = sessionId ?? this.activeSessionId;
+      // Frames carry the gateway handle; translate to the durable id the
+      // renderer's transcripts and threads are keyed by.
+      const sid = sessionId ? this.storedId(sessionId) : this.activeSessionId;
       if (!sid) return null;
       const profileName = this.sessionProfile.get(sid) ?? this.activeProfileFallback();
       if (!profileName) return null;
