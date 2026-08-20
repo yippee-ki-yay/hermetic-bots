@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d282c"/>
+      <stop offset="1" stop-color="#0b0f11"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#8ee6ef"/>
+      <stop offset="1" stop-color="#4fc3ce"/>
+    </linearGradient>
+  </defs>
+
+  <!-- macOS squircle plate -->
+  <rect x="80" y="80" width="864" height="864" rx="196" fill="url(#plate)"/>
+  <rect x="80.5" y="80.5" width="863" height="863" rx="195.5" fill="none"
+        stroke="#68d5df" stroke-opacity="0.16" stroke-width="1"/>
+
+  <!-- Sealed outer ring: a closed band, broken only by the wax-seal notch -->
+  <circle cx="512" cy="512" r="316" fill="none" stroke="url(#mark)" stroke-opacity="0.22" stroke-width="10"/>
+
+  <!-- Constellation emblem, matching the in-app persona mark -->
+  <g stroke="url(#mark)" fill="none" stroke-linecap="round">
+    <circle cx="512" cy="512" r="248" stroke-width="20" stroke-opacity="0.55"
+            stroke-dasharray="86 62" transform="rotate(-24 512 512)"/>
+    <circle cx="512" cy="512" r="164" stroke-width="24" stroke-opacity="0.9"/>
+  </g>
+
+  <!-- Core -->
+  <circle cx="512" cy="512" r="76" fill="url(#mark)"/>
+
+  <!-- Orbital ticks -->
+  <g fill="url(#mark)">
+    <circle cx="760" cy="512" r="30"/>
+    <circle cx="392" cy="272" r="22"/>
+    <circle cx="273" cy="620" r="26"/>
+    <circle cx="646" cy="741" r="20"/>
+  </g>
+</svg>

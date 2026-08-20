@@ -4,8 +4,8 @@
  * (drafts are stored encrypted via secure-store when available).
  */
 import { app } from 'electron';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, cpSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { AppPreferences, OrbDefinition } from '@shared/contracts';
 import { DEFAULT_PREFERENCES } from '@shared/contracts';
 import { log } from '../logging/logger';
@@ -66,12 +66,39 @@ function migrate(data: Record<string, unknown>): SettingsShape {
   };
 }
 
+/**
+ * Product names this app has shipped under. Renaming moves `userData`, which
+ * would silently orphan the saved connection, preferences, and avatars — so
+ * adopt the newest previous directory on first run under the new name.
+ */
+const LEGACY_APP_DIRS = ['Hermes Bots'];
+
+function adoptLegacyData(targetDir: string): void {
+  if (existsSync(join(targetDir, 'settings.json'))) return;
+  const parent = dirname(targetDir);
+  for (const legacy of LEGACY_APP_DIRS) {
+    const source = join(parent, legacy);
+    if (source === targetDir || !existsSync(join(source, 'settings.json'))) continue;
+    try {
+      mkdirSync(targetDir, { recursive: true });
+      cpSync(join(source, 'settings.json'), join(targetDir, 'settings.json'));
+      const avatars = join(source, 'avatars');
+      if (existsSync(avatars)) cpSync(avatars, join(targetDir, 'avatars'), { recursive: true });
+      log.info('settings', `adopted settings from previous app name "${legacy}"`);
+      return;
+    } catch (err) {
+      log.warn('settings', `could not adopt "${legacy}" data: ${(err as Error).message}`);
+    }
+  }
+}
+
 export class SettingsStore {
   private data: SettingsShape;
   private readonly file: string;
 
   constructor(dir = app.getPath('userData')) {
     mkdirSync(dir, { recursive: true });
+    adoptLegacyData(dir);
     this.file = join(dir, 'settings.json');
     this.data = this.load();
   }

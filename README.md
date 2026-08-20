@@ -1,7 +1,8 @@
-# Hermes Bots
+# Hermetic Bots
 
 A private macOS desktop control room for persistent Hermes Agent personas on a
-secured remote VPS. Electron + React + TypeScript, connected exclusively
+secured remote VPS. The name is the joke and the spec: Hermes underneath,
+hermetically sealed over SSH. Electron + React + TypeScript, connected exclusively
 through an app-managed SSH tunnel — the Hermes dashboard is never exposed to
 the public internet.
 
@@ -23,7 +24,8 @@ npm run dev          # electron-vite dev (opens the app)
 npm run typecheck    # main+preload and renderer TS projects
 npm test             # vitest unit suite
 npm run mock-server  # local Hermes REST + /api/ws mock on 127.0.0.1:9119
-npm run package      # electron-builder --mac (packaging: electron-builder)
+npm run icon         # rebuild build/icon.icns from build/icon.svg
+npm run package      # electron-builder --mac -> release/ (.app, .dmg, .zip)
 ```
 
 To run the app against the mock server without a VPS, start the mock server

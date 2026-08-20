@@ -1,6 +1,6 @@
 {
-  "name": "hermes-bots",
-  "productName": "Hermes Bots",
+  "name": "hermetic-bots",
+  "productName": "Hermetic Bots",
   "version": "0.1.0",
   "description": "Private desktop control room for persistent Hermes Agent personas over an SSH tunnel",
   "main": "out/main/index.js",
@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "mock-server": "node tests/mock/hermes-mock-server.mjs",
-    "package": "electron-vite build && electron-builder --mac --config electron-builder.yml"
+    "package": "electron-vite build && electron-builder --mac --config electron-builder.yml",
+    "icon": "electron scripts/make-icon.cjs"
   },
   "dependencies": {
     "react": "^19.2.8",

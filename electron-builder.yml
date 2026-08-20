@@ -1,18 +1,26 @@
 # Packaging: electron-builder (chosen over Forge; documented per spec §11.1)
-appId: com.hrokbots.hermesbots
-productName: Hermes Bots
+appId: com.hermeticbots.app
+productName: Hermetic Bots
 directories:
   output: release
+  buildResources: build
 files:
   - out/**/*
   - package.json
 mac:
   category: public.app-category.developer-tools
+  icon: build/icon.icns
   target:
-    - dmg
-    - zip
-  hardenedRuntime: true
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  # Local builds are unsigned: hardenedRuntime requires a real signing identity,
+  # and enabling it without one produces an app macOS refuses to launch.
+  # Signing/notarization get configured at release time; no credentials here.
+  hardenedRuntime: false
   gatekeeperAssess: false
-  # Signing/notarization configured at release time; no credentials are bundled.
   identity: null
+dmg:
+  title: Hermetic Bots
 npmRebuild: false
