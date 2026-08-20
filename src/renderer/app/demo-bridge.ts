@@ -409,6 +409,18 @@ export function createDemoBridge(): HermesApi {
         let i = 0;
         const eventId = `assistant-demo-${Date.now()}`;
         if (streamTimer) clearInterval(streamTimer);
+        emit({
+          type: 'transcript.event',
+          event: {
+            id: eventId,
+            sessionId: sid,
+            profileName,
+            at: new Date().toISOString(),
+            kind: 'assistant',
+            text: '',
+            streaming: true,
+          },
+        });
         streamTimer = setInterval(() => {
           i += 4;
           emit({
@@ -417,20 +429,6 @@ export function createDemoBridge(): HermesApi {
             eventId,
             textDelta: reply.slice(i - 4, i),
           });
-          if (i === 4) {
-            emit({
-              type: 'transcript.event',
-              event: {
-                id: eventId,
-                sessionId: sid,
-                profileName,
-                at: new Date().toISOString(),
-                kind: 'assistant',
-                text: reply.slice(0, 4),
-                streaming: true,
-              },
-            });
-          }
           if (i >= reply.length) {
             if (streamTimer) clearInterval(streamTimer);
             emit({

@@ -82,9 +82,24 @@ interface AppState {
 
 let toastSeq = 1;
 
-/** Batches streaming deltas into one store update per animation frame (§9.3). */
+/**
+ * Batches streaming deltas into one store update per animation frame (§9.3),
+ * with a timeout fallback so a hidden window (rAF throttled/paused) still
+ * applies deltas and never shows a stale transcript on refocus.
+ */
 const deltaQueue: { sessionId: string; eventId: string; text: string }[] = [];
 let deltaFlushScheduled = false;
+
+function scheduleDeltaFlush(flush: () => void): void {
+  let done = false;
+  const run = (): void => {
+    if (done) return;
+    done = true;
+    flush();
+  };
+  requestAnimationFrame(run);
+  setTimeout(run, 50);
+}
 
 function routeToString(route: Route): string {
   return JSON.stringify(route);
@@ -226,6 +241,13 @@ export const useStore = create<AppState>((set, get) => ({
         return;
       }
       case 'transcript.event': {
+        // A finalized assistant event carries the full text; drop any queued
+        // deltas for it so the pending flush cannot double-append.
+        if (event.event.kind === 'assistant' && !event.event.streaming) {
+          for (let i = deltaQueue.length - 1; i >= 0; i--) {
+            if (deltaQueue[i]?.eventId === event.event.id) deltaQueue.splice(i, 1);
+          }
+        }
         const { transcripts } = get();
         const list = transcripts[event.event.sessionId] ?? [];
         const idx = list.findIndex((e) => e.id === event.event.id);
@@ -241,7 +263,7 @@ export const useStore = create<AppState>((set, get) => ({
         });
         if (!deltaFlushScheduled) {
           deltaFlushScheduled = true;
-          requestAnimationFrame(() => {
+          scheduleDeltaFlush(() => {
             deltaFlushScheduled = false;
             const batch = deltaQueue.splice(0);
             if (batch.length === 0) return;

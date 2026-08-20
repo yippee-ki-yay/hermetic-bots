@@ -853,15 +853,18 @@ export class AppController {
         if (!buf || buf.eventId !== eventId) {
           this.streamBuffers.set(normalized.sessionId, { eventId, text: normalized.textDelta });
           const profileName = this.sessionProfile.get(normalized.sessionId) ?? '';
+          // Push the event empty; the delta below carries the first chunk, so
+          // the renderer never applies the same text twice.
           this.appendTranscript({
             id: eventId,
             sessionId: normalized.sessionId,
             profileName,
             at: new Date().toISOString(),
             kind: 'assistant',
-            text: normalized.textDelta,
+            text: '',
             streaming: true,
           });
+          this.updateStoredAssistant(normalized.sessionId, eventId, normalized.textDelta, true);
         } else {
           buf.text += normalized.textDelta;
           this.updateStoredAssistant(normalized.sessionId, eventId, buf.text, true);

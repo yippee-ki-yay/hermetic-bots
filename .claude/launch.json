@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "renderer-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tests/mock/static-server.mjs"],
+      "port": 5814,
+      "autoPort": true
+    }
+  ]
+}
