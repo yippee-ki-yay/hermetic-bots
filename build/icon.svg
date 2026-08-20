@@ -1,38 +1,93 @@
+<!--
+  Hermetic Bots app icon.
+
+  Flattened from the Claude Design source ("Hermetic Bots Icon.dc.html" in the
+  "Hermetic Bots logo design" project) with its template resolved:
+  showPlate = true, plateShape = "macOS squircle" (plateRx 229), showBubbles = true.
+
+  The artwork was authored on a full-bleed 1024 canvas. Apple's macOS grid puts
+  the squircle at 824x824 centred in 1024, so the design is scaled by 824/1024
+  and offset by 100 — the corner radius ratio (229/1024 = 22.4%) is preserved
+  exactly, and the icon sits at the same visual size as native ones in the Dock.
+-->
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1d282c"/>
-      <stop offset="1" stop-color="#0b0f11"/>
-    </linearGradient>
-    <linearGradient id="mark" x1="0" y1="0" x2="0.6" y2="1">
-      <stop offset="0" stop-color="#8ee6ef"/>
-      <stop offset="1" stop-color="#4fc3ce"/>
-    </linearGradient>
+    <radialGradient id="hbGlow" cx="50%" cy="16%" r="82%">
+      <stop offset="0%" stop-color="#4E8F98" stop-opacity="0.55" />
+      <stop offset="62%" stop-color="#2C6B76" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#0B242C" stop-opacity="0" />
+    </radialGradient>
+    <clipPath id="hbPlateClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="229" />
+    </clipPath>
   </defs>
 
-  <!-- macOS squircle plate -->
-  <rect x="80" y="80" width="864" height="864" rx="196" fill="url(#plate)"/>
-  <rect x="80.5" y="80.5" width="863" height="863" rx="195.5" fill="none"
-        stroke="#68d5df" stroke-opacity="0.16" stroke-width="1"/>
+  <g transform="translate(100 100) scale(0.8046875)">
+    <!-- Plate -->
+    <rect x="0" y="0" width="1024" height="1024" rx="229" fill="#0E2C34" />
+    <rect x="0" y="0" width="1024" height="1024" rx="229" fill="url(#hbGlow)" />
 
-  <!-- Sealed outer ring: a closed band, broken only by the wax-seal notch -->
-  <circle cx="512" cy="512" r="316" fill="none" stroke="url(#mark)" stroke-opacity="0.22" stroke-width="10"/>
+    <!-- Everything the crab is made of stays inside the plate -->
+    <g clip-path="url(#hbPlateClip)">
+      <ellipse cx="512" cy="852" rx="252" ry="34" fill="#04171C" opacity="0.45" />
 
-  <!-- Constellation emblem, matching the in-app persona mark -->
-  <g stroke="url(#mark)" fill="none" stroke-linecap="round">
-    <circle cx="512" cy="512" r="248" stroke-width="20" stroke-opacity="0.55"
-            stroke-dasharray="86 62" transform="rotate(-24 512 512)"/>
-    <circle cx="512" cy="512" r="164" stroke-width="24" stroke-opacity="0.9"/>
-  </g>
+      <!-- Sealed dome -->
+      <g>
+        <rect x="497" y="140" width="30" height="60" rx="15" fill="#F0BC65" />
+        <circle cx="512" cy="128" r="34" fill="#F0BC65" />
+        <circle cx="512" cy="128" r="34" fill="none" stroke="#C79240" stroke-width="8" />
+        <circle cx="512" cy="358" r="215" fill="#8FD8DE" opacity="0.30" />
+        <circle cx="512" cy="358" r="215" fill="none" stroke="#C8F0F2" stroke-opacity="0.65" stroke-width="12" />
+        <path d="M 372 300 Q 398 208 496 176" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="26" stroke-linecap="round" />
+        <g fill="#FFFFFF" opacity="0.4">
+          <circle cx="594" cy="286" r="17" />
+          <circle cx="624" cy="334" r="9" />
+          <circle cx="572" cy="356" r="6" />
+        </g>
+      </g>
 
-  <!-- Core -->
-  <circle cx="512" cy="512" r="76" fill="url(#mark)"/>
+      <!-- Eye stalks -->
+      <g>
+        <path d="M 466 620 L 458 512" fill="none" stroke="#D95F45" stroke-width="24" stroke-linecap="round" />
+        <path d="M 558 620 L 566 512" fill="none" stroke="#D95F45" stroke-width="24" stroke-linecap="round" />
+        <circle cx="456" cy="482" r="37" fill="#FFFFFF" />
+        <circle cx="568" cy="482" r="37" fill="#FFFFFF" />
+        <circle cx="463" cy="487" r="16" fill="#17303A" />
+        <circle cx="575" cy="487" r="16" fill="#17303A" />
+        <circle cx="457" cy="479" r="6" fill="#FFFFFF" />
+        <circle cx="569" cy="479" r="6" fill="#FFFFFF" />
+      </g>
 
-  <!-- Orbital ticks -->
-  <g fill="url(#mark)">
-    <circle cx="760" cy="512" r="30"/>
-    <circle cx="392" cy="272" r="22"/>
-    <circle cx="273" cy="620" r="26"/>
-    <circle cx="646" cy="741" r="20"/>
+      <!-- Jar rim -->
+      <rect x="352" y="540" width="320" height="66" rx="33" fill="#F0BC65" />
+      <rect x="352" y="572" width="320" height="34" rx="17" fill="#C79240" opacity="0.85" />
+
+      <!-- Legs -->
+      <g fill="none" stroke="#D95F45" stroke-width="26" stroke-linecap="round">
+        <path d="M 415 780 C 375 815 345 832 312 828" />
+        <path d="M 468 800 C 435 840 408 862 375 860" />
+        <path d="M 520 810 C 495 852 475 872 442 872" />
+        <path d="M 609 780 C 649 815 679 832 712 828" />
+        <path d="M 556 800 C 589 840 616 862 649 860" />
+        <path d="M 504 810 C 529 852 549 872 582 872" />
+      </g>
+
+      <!-- Arms and claws -->
+      <g>
+        <path d="M 384 700 C 324 700 294 678 264 648" fill="none" stroke="#D95F45" stroke-width="46" stroke-linecap="round" />
+        <path d="M 640 700 C 700 700 730 678 760 648" fill="none" stroke="#D95F45" stroke-width="46" stroke-linecap="round" />
+        <ellipse cx="194" cy="588" rx="80" ry="47" fill="#F4795B" transform="rotate(26 194 588)" />
+        <ellipse cx="212" cy="656" rx="67" ry="39" fill="#D95F45" transform="rotate(-14 212 656)" />
+        <ellipse cx="830" cy="588" rx="80" ry="47" fill="#F4795B" transform="rotate(-26 830 588)" />
+        <ellipse cx="812" cy="656" rx="67" ry="39" fill="#D95F45" transform="rotate(14 812 656)" />
+      </g>
+
+      <!-- Shell -->
+      <ellipse cx="512" cy="700" rx="196" ry="126" fill="#F4795B" />
+      <ellipse cx="464" cy="662" rx="88" ry="38" fill="#FFFFFF" opacity="0.20" />
+    </g>
+
+    <!-- Edge highlight sits above the art, as in the source -->
+    <rect x="0" y="0" width="1024" height="1024" rx="229" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="6" />
   </g>
 </svg>
