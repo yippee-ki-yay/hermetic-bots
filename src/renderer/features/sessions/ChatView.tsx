@@ -5,7 +5,7 @@ import { CommandHeader } from '../../components/shell/CommandHeader';
 import { Transcript } from '../../components/transcript/Transcript';
 import { ActivityStrip } from '../../components/composer/ActivityStrip';
 import { Composer } from '../../components/composer/Composer';
-import { PersonaOrb } from '../../components/shell/PersonaOrb';
+import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 
 const STARTERS: Record<string, string[]> = {
   default: [
@@ -67,7 +67,7 @@ export function ChatView({
       ) : (
         <div className="empty-state">
           {bot ? (
-            <PersonaOrb orb={bot.orb} size={72} title={bot.displayName} avatar={bot.avatarDataUri} />
+            <PersonaAvatar orb={bot.orb} size={72} title={bot.displayName} avatar={bot.avatarDataUri} />
           ) : null}
           <div className="es-title">{bot?.displayName ?? profile}</div>
           <div className="es-sub">{bot?.role ?? bot?.description ?? 'Start a new thread below.'}</div>

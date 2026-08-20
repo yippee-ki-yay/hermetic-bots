@@ -84,9 +84,14 @@ export interface Capabilities {
 
 export interface OrbDefinition {
   paletteId: string;
-  ringCount: 1 | 2 | 3;
-  tickPattern: number;
   seed: string;
+  /** Jar shape, eye style, and pose; derived from the seed when unset. */
+  jar?: 'bell' | 'cylinder' | 'flask' | 'hex' | 'bulb';
+  eyes?: 'stalks' | 'cyclops' | 'sleepy' | 'wide';
+  pose?: 'rest' | 'wave';
+  /** Retained so metadata written before the crab avatars still validates. */
+  ringCount?: 1 | 2 | 3;
+  tickPattern?: number;
 }
 
 export type BotRunState = 'idle' | 'running' | 'attention' | 'error';
@@ -402,12 +407,3 @@ export const CONNECTION_DEFAULTS = {
   remoteDashboardPort: 9119,
   expectedHermesVersion: '0.20.4',
 } as const;
-
-export const ORB_PALETTE: { id: string; color: string; name: string }[] = [
-  { id: 'cyan', color: '#68d5df', name: 'Cyan' },
-  { id: 'amber', color: '#e4ad63', name: 'Amber' },
-  { id: 'sage', color: '#8fc9a0', name: 'Sage' },
-  { id: 'lavender', color: '#a9a7e0', name: 'Lavender' },
-  { id: 'rose', color: '#d99aa4', name: 'Rose' },
-  { id: 'slate', color: '#8fb0c9', name: 'Slate' },
-];

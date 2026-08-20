@@ -26,6 +26,7 @@ import { log, recordDiagnostic, buildDiagnosticsReport, getLogLines } from './lo
 import { AppError, publicError, toPublicError, type PublicError } from '@shared/errors';
 import { APP_NAME } from '@shared/branding';
 import { displayNameFor } from '@shared/display-names';
+import { AVATAR_PALETTES } from '@shared/avatar';
 import type {
   BotSummary,
   Capabilities,
@@ -404,12 +405,10 @@ export class AppController {
       role: meta?.role,
       orb:
         meta?.orb ??
+        // No stored look yet: seed off the profile name so the avatar is
+        // stable and distinct without anyone choosing one.
         {
-          paletteId: ['cyan', 'amber', 'sage', 'lavender', 'rose', 'slate'][
-            Math.abs(hashCode(profileName)) % 6
-          ]!,
-          ringCount: ((Math.abs(hashCode(profileName)) % 3) + 1) as 1 | 2 | 3,
-          tickPattern: Math.abs(hashCode(profileName)) % 512,
+          paletteId: AVATAR_PALETTES[Math.abs(hashCode(profileName)) % AVATAR_PALETTES.length]!.id,
           seed: profileName,
         },
     };
@@ -577,8 +576,14 @@ export class AppController {
   }
 
   async refreshThreads(profileName: string): Promise<ThreadSummary[]> {
-    const sidebar = await this.rest.sidebarSessions(profileName);
-    const sessions = sidebar ?? (await this.rest.listSessions(profileName));
+    // `/api/sessions?profile=` scopes correctly; the sidebar endpoint accepts
+    // the parameter but ignores it and always answers with the launch
+    // profile's recents, which showed every bot the same history. Each row
+    // carries its own `profile`, so filter on that as well rather than
+    // trusting the endpoint.
+    const sessions = (await this.rest.listSessions(profileName)).filter(
+      (s) => !s.profile || s.profile === profileName,
+    );
     const threads = sessions.map((s) => this.toThread(s, profileName));
     threads.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
     this.threads.set(profileName, threads);
@@ -589,7 +594,11 @@ export class AppController {
 
   async searchThreads(query: string, profileName: string): Promise<ThreadSummary[]> {
     const sessions = await this.rest.searchSessions(query, profileName);
-    return sessions.map((s) => this.toThread(s, profileName));
+    // Same guard as refreshThreads: never show another profile's threads even
+    // if an endpoint forgets to scope.
+    return sessions
+      .filter((s) => !s.profile || s.profile === profileName)
+      .map((s) => this.toThread(s, profileName));
   }
 
   async loadHistory(profileName: string, sessionId: string): Promise<TranscriptEvent[]> {

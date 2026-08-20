@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { AssistantTurn, UserTurn, ToolRow, SystemMarker } from './events';
 import { ApprovalPanel, ClarifyPanel, SudoPanel, SecretPanel } from './RequestPanels';
-import { orbColor } from '../shell/PersonaOrb';
+import { avatarBodyColor } from '../shell/PersonaAvatar';
 import type { TranscriptEvent } from '@shared/contracts';
 
 const WINDOW_SIZE = 300;
@@ -87,7 +87,7 @@ export function Transcript({
     lastLiveAnnouncement.current = liveText;
   }, [liveText]);
 
-  const color = bot ? orbColor(bot.orb) : 'var(--accent-cyan)';
+  const color = bot ? avatarBodyColor(bot.orb) : 'var(--accent-cyan)';
 
   const renderEvent = (e: TranscriptEvent): React.JSX.Element | null => {
     switch (e.kind) {

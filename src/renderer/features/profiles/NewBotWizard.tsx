@@ -3,9 +3,10 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap } from '../../app/api';
-import { PersonaOrb } from '../../components/shell/PersonaOrb';
+import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 import { PersonaPicker } from './PersonaPicker';
-import { ORB_PALETTE, type OrbDefinition, type CreateBotStepResult } from '@shared/contracts';
+import type { OrbDefinition, CreateBotStepResult } from '@shared/contracts';
+import { AVATAR_PALETTES, JAR_SHAPES, EYE_STYLES, POSES, resolveAvatar } from '@shared/avatar';
 import type { PublicError } from '@shared/errors';
 
 const STEPS = ['Identity', 'Persona', 'Capabilities', 'Telegram', 'Review'] as const;
@@ -50,7 +51,7 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
     displayName: '',
     role: '',
     description: '',
-    orb: { paletteId: 'cyan', ringCount: 2, tickPattern: Math.floor(Math.random() * 512), seed: String(Date.now()) },
+    orb: { paletteId: AVATAR_PALETTES[0]!.id, seed: String(Date.now()) },
     startingPoint: 'blank',
     cloneFrom: null,
     soul: '',
@@ -72,6 +73,10 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
   } | null>(null);
 
   const set = (patch: Partial<WizardData>): void => setData((d) => ({ ...d, ...patch }));
+
+  // Seed off the profile name so the preview matches what gets created.
+  const previewOrb = { ...data.orb, seed: data.name || data.orb.seed };
+  const resolved = resolveAvatar(previewOrb);
   const go = (s: number): void => navigate({ view: 'wizard', step: s });
 
   const nameError = useMemo(() => {
@@ -254,11 +259,7 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                   <h3>Picture</h3>
                   <div className="orb-editor">
                     <div className="orb-preview">
-                      <PersonaOrb
-                        orb={{ ...data.orb, seed: data.name || data.orb.seed }}
-                        size={84}
-                        avatar={data.avatarDataUri}
-                      />
+                      <PersonaAvatar orb={previewOrb} size={84} avatar={data.avatarDataUri} />
                     </div>
                     <div className="orb-controls">
                       <div style={{ display: 'flex', gap: 8 }}>
@@ -277,13 +278,13 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                         </button>
                         {data.avatarDataUri ? (
                           <button className="btn ghost" onClick={() => set({ avatarDataUri: undefined })}>
-                            Use generated mark
+                            Use drawn avatar
                           </button>
                         ) : null}
                       </div>
                       <div className="hint">
-                        Optional. Without a picture the bot gets the generated constellation mark
-                        below, which stays unique per bot.
+                        Optional. Without a picture the bot gets the drawn avatar below, which
+                        stays unique per bot.
                       </div>
                     </div>
                   </div>
@@ -292,74 +293,70 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                   className="card"
                   style={data.avatarDataUri ? { opacity: 0.55 } : undefined}
                 >
-                  <h3>Generated mark</h3>
+                  <h3>Drawn avatar</h3>
                   <div className="orb-editor">
                     <div className="orb-preview">
-                      <PersonaOrb orb={{ ...data.orb, seed: data.name || data.orb.seed }} size={84} />
+                      <PersonaAvatar orb={previewOrb} size={84} />
                     </div>
                     <div className="orb-controls">
-                      <div className="swatch-row" role="radiogroup" aria-label="Orb color">
-                        {ORB_PALETTE.map((p) => (
+                      <div className="swatch-row" role="radiogroup" aria-label="Avatar colour">
+                        {AVATAR_PALETTES.map((p) => (
                           <button
                             key={p.id}
                             role="radio"
                             aria-checked={data.orb.paletteId === p.id}
                             aria-label={p.name}
+                            title={p.name}
                             className={`swatch ${data.orb.paletteId === p.id ? 'on' : ''}`}
-                            style={{ background: p.color }}
+                            style={{ background: p.body }}
                             onClick={() => set({ orb: { ...data.orb, paletteId: p.id } })}
                           />
                         ))}
                       </div>
-                      <div className="seg-row" role="radiogroup" aria-label="Ring count">
-                        {[1, 2, 3].map((n) => (
+                      <div className="seg-row" role="radiogroup" aria-label="Jar shape">
+                        {JAR_SHAPES.map((j) => (
                           <button
-                            key={n}
+                            key={j}
                             role="radio"
-                            aria-checked={data.orb.ringCount === n}
-                            className={data.orb.ringCount === n ? 'on' : ''}
-                            onClick={() => set({ orb: { ...data.orb, ringCount: n as 1 | 2 | 3 } })}
+                            aria-checked={resolved.jar === j}
+                            className={resolved.jar === j ? 'on' : ''}
+                            onClick={() => set({ orb: { ...data.orb, jar: j } })}
                           >
-                            {n} ring{n > 1 ? 's' : ''}
+                            {j}
                           </button>
                         ))}
                       </div>
-                      <button
-                        className="btn"
-                        style={{ alignSelf: 'flex-start' }}
-                        onClick={() => set({ orb: { ...data.orb, tickPattern: Math.floor(Math.random() * 512) } })}
-                      >
-                        Shuffle ticks
-                      </button>
+                      <div className="seg-row" role="radiogroup" aria-label="Eyes">
+                        {EYE_STYLES.map((e) => (
+                          <button
+                            key={e}
+                            role="radio"
+                            aria-checked={resolved.eyes === e}
+                            className={resolved.eyes === e ? 'on' : ''}
+                            onClick={() => set({ orb: { ...data.orb, eyes: e } })}
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="seg-row" role="radiogroup" aria-label="Pose">
+                        {POSES.map((po) => (
+                          <button
+                            key={po}
+                            role="radio"
+                            aria-checked={resolved.pose === po}
+                            className={resolved.pose === po ? 'on' : ''}
+                            onClick={() => set({ orb: { ...data.orb, pose: po } })}
+                          >
+                            {po}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="hint">
+                        Jar, eyes, and pose vary independently of colour, so two bots never rely on
+                        hue alone to tell apart.
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div className="card">
-                  <h3>Starting point</h3>
-                  <div className="radio-cards">
-                    <button className={`radio-card ${data.startingPoint === 'blank' ? 'on' : ''}`} onClick={() => set({ startingPoint: 'blank', cloneFrom: null })}>
-                      <div>
-                        <div className="rc-title">Blank profile</div>
-                        <div className="rc-desc">Fresh Hermes state with defaults.</div>
-                      </div>
-                    </button>
-                    <button className={`radio-card ${data.startingPoint === 'clone' ? 'on' : ''}`} onClick={() => set({ startingPoint: 'clone', cloneFrom: bots[0]?.profileName ?? null })}>
-                      <div style={{ width: '100%' }}>
-                        <div className="rc-title">Clone an existing profile</div>
-                        <div className="rc-desc">Copies configuration from a profile you pick.</div>
-                        {data.startingPoint === 'clone' ? (
-                          <div className="field" style={{ marginTop: 10, marginBottom: 0 }}>
-                            <select value={data.cloneFrom ?? ''} onChange={(e) => set({ cloneFrom: e.target.value || null })}>
-                              {bots.map((b) => (
-                                <option key={b.profileName} value={b.profileName}>
-                                  {b.displayName} ({b.profileName})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : null}
-                      </div>
-                    </button>
                   </div>
                 </div>
                 {footer()}

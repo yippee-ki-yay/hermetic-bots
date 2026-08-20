@@ -330,17 +330,6 @@ export class DashboardClient {
     return unwrapSessions(data);
   }
 
-  async sidebarSessions(profile?: string): Promise<RestSession[] | null> {
-    try {
-      const data = await this.request('GET', '/api/profiles/sessions/sidebar', {
-        profile,
-        schema: sessionsResponseSchema,
-      });
-      return unwrapSessions(data);
-    } catch {
-      return null; // fall back to /api/sessions
-    }
-  }
 
   async searchSessions(query: string, profile?: string): Promise<RestSession[]> {
     const port = this.getPort();

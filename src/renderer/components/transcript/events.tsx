@@ -11,7 +11,7 @@ import { Icon, type IconName } from '../common/Icon';
 import { formatClock } from '../common/ui';
 import { api, unwrap } from '../../app/api';
 import { useStore } from '../../state/store';
-import { orbColor } from '../shell/PersonaOrb';
+import { avatarBodyColor } from '../shell/PersonaAvatar';
 
 export function AssistantTurn({
   event,
@@ -152,4 +152,4 @@ export function SystemMarker({ event }: { event: SystemEvent }): React.JSX.Eleme
   );
 }
 
-export { orbColor };
+export { avatarBodyColor };

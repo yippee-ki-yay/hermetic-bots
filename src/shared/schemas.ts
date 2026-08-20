@@ -27,9 +27,13 @@ export type ConnectConfigInput = z.infer<typeof connectConfigSchema>;
 
 export const orbDefinitionSchema = z.object({
   paletteId: z.string().max(32),
-  ringCount: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  tickPattern: z.number().int().min(0).max(1023),
   seed: z.string().max(64),
+  jar: z.enum(['bell', 'cylinder', 'flask', 'hex', 'bulb']).optional(),
+  eyes: z.enum(['stalks', 'cyclops', 'sleepy', 'wide']).optional(),
+  pose: z.enum(['rest', 'wave']).optional(),
+  // Legacy fields from the pre-avatar orb marks; accepted, no longer written.
+  ringCount: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  tickPattern: z.number().int().min(0).max(1023).optional(),
 });
 
 export const createBotSchema = z.object({

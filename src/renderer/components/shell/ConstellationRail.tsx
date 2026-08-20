@@ -4,7 +4,7 @@
  * requested for v1 so identity reads at a glance rather than on hover).
  */
 import { useStore } from '../../state/store';
-import { PersonaOrb } from './PersonaOrb';
+import { PersonaAvatar } from './PersonaAvatar';
 import { Icon } from '../common/Icon';
 import { APP_NAME } from '@shared/branding';
 import type { BotSummary } from '@shared/contracts';
@@ -68,7 +68,7 @@ export function ConstellationRail(): React.JSX.Element {
             onClick={() => selectBot(bot.profileName)}
           >
             <span className="orb-figure">
-              <PersonaOrb orb={bot.orb} size={34} avatar={bot.avatarDataUri} />
+              <PersonaAvatar orb={bot.orb} size={34} avatar={bot.avatarDataUri} />
               <span className={`orb-status ${statusClass(bot)}`} />
             </span>
             <span className="orb-meta">

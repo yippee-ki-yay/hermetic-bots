@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useStore, type BotTab } from '../../state/store';
 import { api, unwrap } from '../../app/api';
-import { PersonaOrb } from '../../components/shell/PersonaOrb';
+import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 import { ConfirmDialog, Switch, formatRelative } from '../../components/common/ui';
 import type { LogLine, TelegramStatus } from '@shared/contracts';
 
@@ -126,7 +126,7 @@ export function BotDetails({ profile, tab }: { profile: string; tab: BotTab }): 
       <div className="center-view" style={{ paddingTop: 24 }}>
         <div className="center-col">
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            {bot ? <PersonaOrb orb={bot.orb} size={56} avatar={bot.avatarDataUri} /> : null}
+            {bot ? <PersonaAvatar orb={bot.orb} size={56} avatar={bot.avatarDataUri} /> : null}
             <div style={{ minWidth: 0 }}>
               <div className="view-title">{bot?.displayName ?? profile}</div>
               <div className="view-sub" style={{ marginTop: 2 }}>
