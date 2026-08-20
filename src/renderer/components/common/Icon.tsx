@@ -40,7 +40,8 @@ export type IconName =
 const PATHS: Record<IconName, string> = {
   plus: 'M12 5v14M5 12h14',
   search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4',
-  send: 'M5 12L20 5l-3.5 7L20 19zM5 12h11.5',
+  // Paper plane pointing up-and-right, the usual "send" direction.
+  send: 'M21 3 14 21l-3.5-7.5L3 10z M21 3 10.5 13.5',
   stop: 'M7 7h10v10H7z',
   settings:
     'M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zM12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6',

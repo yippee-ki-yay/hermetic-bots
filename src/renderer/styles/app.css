@@ -1093,8 +1093,18 @@ button:focus-visible,
   min-height: 72px;
 }
 
+/*
+ * Focusing the composer used to paint the whole dock cyan *and* draw the
+ * global focus ring around the textarea inside it — a box inside a box. The
+ * caret already shows where typing goes, so focus now reads as a quiet lift
+ * of the existing border instead.
+ */
 .composer:focus-within {
-  border-color: var(--accent-cyan);
+  border-color: #46595f;
+}
+
+.composer textarea:focus-visible {
+  outline: none;
 }
 
 .composer textarea {

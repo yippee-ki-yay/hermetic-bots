@@ -101,7 +101,8 @@ export function Composer({
         <textarea
           ref={textareaRef}
           rows={1}
-          placeholder={`Ask ${bot?.displayName ?? profile}…`}
+          // No visible placeholder by preference; the label keeps the field
+          // announced for screen readers.
           aria-label={`Message ${bot?.displayName ?? profile}`}
           value={draft}
           disabled={!online && !sessionId}
