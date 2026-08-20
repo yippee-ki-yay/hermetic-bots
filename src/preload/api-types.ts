@@ -12,6 +12,7 @@ import type {
   CreateBotResult,
   HostTrustPrompt,
   LogLine,
+  ModelOptions,
   OrbDefinition,
   PersonaSummary,
   PushEnvelope,
@@ -161,6 +162,9 @@ export interface HermesApi {
     }): Promise<IpcResult<TelegramStatus>>;
     test(profileName: string): Promise<IpcResult<{ ok: boolean; message: string }>>;
     gateway(profileName: string, action: 'start' | 'stop' | 'restart'): Promise<IpcResult<TelegramStatus>>;
+  };
+  models: {
+    options(profileName?: string): Promise<IpcResult<ModelOptions>>;
   };
   personas: {
     /** Metadata for the bundled persona library; bodies load on demand. */

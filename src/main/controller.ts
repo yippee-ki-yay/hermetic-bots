@@ -43,6 +43,7 @@ import type {
   CreateBotStepResult,
   OrbDefinition,
   LogLine,
+  ModelOptions,
 } from '@shared/contracts';
 import type { ConnectConfigInput } from '@shared/schemas';
 
@@ -1250,6 +1251,15 @@ export class AppController {
       this.capabilities.mcp ? this.rest.mcp(profileName).catch(() => null) : Promise.resolve(null),
     ]);
     return { soul, modelInfo, modelOptions, toolsets, skills, mcp };
+  }
+
+  /**
+   * Providers and models the server can actually serve. New bots must inherit
+   * a provider that has credentials — hardcoding one produced profiles that
+   * failed agent init with "No usable credentials found".
+   */
+  async modelOptions(profileName?: string): Promise<ModelOptions> {
+    return await this.rest.modelOptions(profileName);
   }
 
   async getLogs(profileName?: string): Promise<LogLine[]> {

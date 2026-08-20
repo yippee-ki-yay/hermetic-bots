@@ -205,6 +205,10 @@ export function registerHermesIpc(controller: AppController): void {
     ({ profileName, action }) => controller.gatewayAction(profileName, action),
   );
 
+  handle('models.options', z.object({ profileName: profileNameSchema.optional() }), ({ profileName }) =>
+    controller.modelOptions(profileName),
+  );
+
   // --- persona library (bundled; no network at runtime) --------------------
 
   handle('personas.index', null, () => personaIndex());

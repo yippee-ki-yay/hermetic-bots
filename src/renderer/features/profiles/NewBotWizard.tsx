@@ -1,12 +1,13 @@
 /** Five-step New Bot wizard (spec §7.3): Identity, Persona, Capabilities,
  * Telegram, Review — with recoverable partial failure. */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap } from '../../app/api';
 import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 import { PersonaPicker } from './PersonaPicker';
 import type { OrbDefinition, CreateBotStepResult } from '@shared/contracts';
 import { AVATAR_PALETTES, JAR_SHAPES, EYE_STYLES, POSES, resolveAvatar } from '@shared/avatar';
+import type { ModelOptions } from '@shared/contracts';
 import type { PublicError } from '@shared/errors';
 
 const STEPS = ['Identity', 'Persona', 'Capabilities', 'Telegram', 'Review'] as const;
@@ -55,8 +56,8 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
     startingPoint: 'blank',
     cloneFrom: null,
     soul: '',
-    provider: 'grok',
-    model: 'grok-4.5',
+    provider: '',
+    model: '',
     workingDirNote: '',
     approvalMode: 'require-approval',
     telegramToken: '',
@@ -65,6 +66,32 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
     telegramSkipped: false,
   }));
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [models, setModels] = useState<ModelOptions | null>(null);
+
+  // Providers must come from the server: a hardcoded slug produced profiles
+  // whose agent init failed with "No usable credentials found".
+  useEffect(() => {
+    void unwrap(api().models.options())
+      .then((opts) => {
+        setModels(opts);
+        const current =
+          opts.providers.find((p) => p.slug === opts.currentProvider) ??
+          opts.providers.find((p) => p.isCurrent && p.authenticated) ??
+          opts.providers.find((p) => p.authenticated);
+        if (!current) return;
+        setData((prev) =>
+          prev.provider
+            ? prev
+            : {
+                ...prev,
+                provider: current.slug,
+                model:
+                  current.models.find((m) => m === opts.currentModel) ?? current.models[0] ?? '',
+              },
+        );
+      })
+      .catch(() => undefined);
+  }, []);
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState<{
     profileName?: string;
@@ -413,17 +440,45 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                 <div className="view-title">Capabilities</div>
                 <div className="card">
                   <h3>Provider &amp; model</h3>
-                  <div className="field-row">
-                    <div className="field">
-                      <label>Provider</label>
-                      <input type="text" value={data.provider} onChange={(e) => set({ provider: e.target.value })} spellCheck={false} />
-                      <div className="hint">This deployment currently uses Grok OAuth; no provider keys are entered here.</div>
+                  {models === null ? (
+                    <div className="view-sub" style={{ marginTop: 0 }}>Loading providers…</div>
+                  ) : (
+                    <div className="field-row">
+                      <div className="field">
+                        <label>Provider</label>
+                        <select
+                          value={data.provider}
+                          onChange={(e) => {
+                            const p = models.providers.find((x) => x.slug === e.target.value);
+                            set({ provider: e.target.value, model: p?.models[0] ?? '' });
+                          }}
+                        >
+                          {models.providers.map((p) => (
+                            <option key={p.slug} value={p.slug} disabled={!p.authenticated}>
+                              {p.name}
+                              {p.authenticated ? '' : ' — no credentials'}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="hint">
+                          Only providers the server already has credentials for can run. Picking one
+                          without them creates a bot that fails on its first prompt.
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label>Model</label>
+                        <select value={data.model} onChange={(e) => set({ model: e.target.value })}>
+                          {(models.providers.find((p) => p.slug === data.provider)?.models ?? []).map(
+                            (m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
                     </div>
-                    <div className="field">
-                      <label>Model</label>
-                      <input type="text" value={data.model} onChange={(e) => set({ model: e.target.value })} spellCheck={false} />
-                    </div>
-                  </div>
+                  )}
                 </div>
                 <div className="card">
                   <h3>Approvals</h3>
@@ -525,7 +580,7 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                     <dt>Starting point</dt>
                     <dd>{data.startingPoint === 'clone' ? `Clone of ${data.cloneFrom}` : 'Blank'}</dd>
                     <dt>Model</dt>
-                    <dd className="mono">{data.provider} / {data.model}</dd>
+                    <dd className="mono">{data.provider ? `${data.provider} / ${data.model}` : 'server default'}</dd>
                     <dt>SOUL</dt>
                     <dd>{data.soul.trim() ? `${data.soul.length.toLocaleString()} characters` : 'default'}</dd>
                     <dt>Approvals</dt>

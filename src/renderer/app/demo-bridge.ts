@@ -531,6 +531,17 @@ export function createDemoBridge(): HermesApi {
       gateway: (profileName) =>
         ok(telegramState.get(profileName) ?? { configured: false, enabled: false, state: 'disabled' as const }),
     },
+    models: {
+      options: () =>
+        ok({
+          providers: [
+            { slug: 'xai-oauth', name: 'xAI Grok OAuth', models: ['grok-4.6', 'grok-4.5'], authenticated: true, isCurrent: true },
+            { slug: 'anthropic', name: 'Anthropic', models: ['claude-opus-5'], authenticated: false, isCurrent: false },
+          ],
+          currentProvider: 'xai-oauth',
+          currentModel: 'grok-4.5',
+        }),
+    },
     personas: {
       // The real catalogue is a main-process resource; demo mode ships a few
       // entries so the picker is still reviewable in a browser.

@@ -265,6 +265,22 @@ export interface ModelOption {
   label?: string;
 }
 
+/** One provider Hermes can serve, with the models it exposes. */
+export interface ProviderOption {
+  slug: string;
+  name: string;
+  models: string[];
+  /** False when the server has no usable credentials for it. */
+  authenticated: boolean;
+  isCurrent: boolean;
+}
+
+export interface ModelOptions {
+  providers: ProviderOption[];
+  currentProvider?: string;
+  currentModel?: string;
+}
+
 export interface ToolsetInfo {
   id: string;
   name: string;

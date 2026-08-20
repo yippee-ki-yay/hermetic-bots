@@ -110,6 +110,21 @@ const statusResponseSchema = z
   })
   .loose();
 
+export interface ProviderOption {
+  slug: string;
+  name: string;
+  models: string[];
+  /** Whether this provider has usable credentials on the server. */
+  authenticated: boolean;
+  isCurrent: boolean;
+}
+
+export interface ModelOptions {
+  providers: ProviderOption[];
+  currentProvider?: string;
+  currentModel?: string;
+}
+
 export interface CreateProfileRequest {
   name: string;
   clone_from?: string | null;
@@ -187,7 +202,7 @@ export class DashboardClient {
   private async request<T>(
     method: string,
     path: string,
-    opts: { body?: unknown; profile?: string; schema?: z.ZodType<T> } = {},
+    opts: { body?: unknown; profile?: string; schema?: z.ZodType<T>; notFoundOk?: boolean } = {},
     isRetryAfter401 = false,
   ): Promise<T> {
     const url = new URL(path, this.base());
@@ -219,6 +234,12 @@ export class DashboardClient {
       log.warn('rest', `${method} ${path} -> 401; re-bootstrapping session token`);
       await this.bootstrapSessionToken();
       return this.request(method, path, opts, true);
+    }
+
+    if (res.status === 404 && opts.notFoundOk) {
+      // Hermes persists a session row lazily on its first completed turn, so
+      // a freshly created thread legitimately has no messages yet.
+      return null as T;
     }
 
     if (!res.ok) {
@@ -344,7 +365,11 @@ export class DashboardClient {
   }
 
   async getMessages(sessionId: string): Promise<unknown[]> {
-    const data = await this.request<unknown>('GET', `/api/sessions/${encodeURIComponent(sessionId)}/messages`);
+    const data = await this.request<unknown>(
+      'GET',
+      `/api/sessions/${encodeURIComponent(sessionId)}/messages`,
+      { notFoundOk: true },
+    );
     if (Array.isArray(data)) return data;
     if (data && typeof data === 'object' && Array.isArray((data as { messages?: unknown[] }).messages)) {
       return (data as { messages: unknown[] }).messages;
@@ -370,8 +395,34 @@ export class DashboardClient {
 
   // --- capabilities-related reads -----------------------------------------
 
-  async modelOptions(profile?: string): Promise<unknown> {
-    return await this.request('GET', '/api/model/options', { profile });
+  /**
+   * Hermes answers with `{providers: [{slug, name, models[], authenticated,
+   * is_current}], model, provider}` — not the flat {provider, model} pairs the
+   * build spec implied. Normalize it so callers get a usable list.
+   */
+  async modelOptions(profile?: string): Promise<ModelOptions> {
+    const raw = await this.request<unknown>('GET', '/api/model/options', { profile });
+    const obj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    const rows = Array.isArray(obj.providers) ? obj.providers : [];
+    const providers: ProviderOption[] = [];
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const r = row as Record<string, unknown>;
+      const slug = typeof r.slug === 'string' ? r.slug : undefined;
+      if (!slug) continue;
+      providers.push({
+        slug,
+        name: typeof r.name === 'string' ? r.name : slug,
+        models: Array.isArray(r.models) ? r.models.filter((m): m is string => typeof m === 'string') : [],
+        authenticated: r.authenticated === true,
+        isCurrent: r.is_current === true,
+      });
+    }
+    return {
+      providers,
+      currentProvider: typeof obj.provider === 'string' ? obj.provider : undefined,
+      currentModel: typeof obj.model === 'string' ? obj.model : undefined,
+    };
   }
 
   async modelInfo(profile?: string): Promise<unknown> {

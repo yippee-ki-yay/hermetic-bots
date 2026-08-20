@@ -90,6 +90,9 @@ const api: HermesApi = {
     test: (profileName) => invoke('telegram.test', { profileName }),
     gateway: (profileName, action) => invoke('gateway.action', { profileName, action }),
   },
+  models: {
+    options: (profileName) => invoke('models.options', { profileName }),
+  },
   personas: {
     index: () => invoke('personas.index'),
     soul: (id) => invoke('personas.soul', { id }),
