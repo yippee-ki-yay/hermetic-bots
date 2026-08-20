@@ -132,6 +132,15 @@ export const externalUrlSchema = z.object({
   url: z.string().url().max(2048),
 });
 
+/** Avatar payloads are bounded well above the encoder's own output budget. */
+export const avatarSetSchema = z.object({
+  profileName: profileNameSchema,
+  dataUri: z
+    .string()
+    .max(1_400_000)
+    .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, 'Expected a base64 image data URI'),
+});
+
 export const deleteProfileSchema = z.object({
   profileName: profileNameSchema,
   /** Renderer must pass the exact typed confirmation (spec §9.5). */

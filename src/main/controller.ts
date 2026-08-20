@@ -20,6 +20,7 @@ import {
   type NormalizerContext,
 } from './hermes/event-normalizer';
 import { SettingsStore, type StoredConnection } from './storage/settings-store';
+import { pickAvatar, saveAvatar, clearAvatar, loadAvatar, clearAvatarCache } from './avatars';
 import { registerSecret, redact } from './logging/redaction';
 import { log, recordDiagnostic, buildDiagnosticsReport, getLogLines } from './logging/logger';
 import { AppError, publicError, toPublicError, type PublicError } from '@shared/errors';
@@ -268,6 +269,9 @@ export class AppController {
   async disconnect(): Promise<void> {
     this.ws.disconnect();
     this.rest.clearSessionToken();
+    // Avatars are keyed by server fingerprint; drop the cache so a different
+    // server never shows the previous one's pictures.
+    clearAvatarCache();
     await this.tunnel.stop();
     this.stopHealthTimer();
     this.pushConnection();
@@ -422,6 +426,7 @@ export class AppController {
         role: meta.role,
         description: p.description,
         orb: meta.orb,
+        avatarDataUri: loadAvatar(this.serverFingerprint, p.name),
         provider: p.provider,
         model: p.model,
         runState: prev?.runState ?? 'idle',
@@ -443,13 +448,40 @@ export class AppController {
   setOrbMetadata(profileName: string, entry: { displayName?: string; role?: string; orb?: OrbDefinition }): void {
     const existing = this.settings.orbFor(this.serverFingerprint, profileName) ?? {};
     this.settings.setOrb(this.serverFingerprint, profileName, { ...existing, ...entry });
+    this.republishBot(profileName);
+  }
+
+  private republishBot(profileName: string): void {
     const bot = this.bots.get(profileName);
-    if (bot) {
-      const meta = this.orbFromMetadata(profileName);
-      const updated = { ...bot, displayName: meta.displayName, role: meta.role, orb: meta.orb };
-      this.bots.set(profileName, updated);
-      this.push({ type: 'bot.updated', bot: updated });
-    }
+    if (!bot) return;
+    const meta = this.orbFromMetadata(profileName);
+    const updated: BotSummary = {
+      ...bot,
+      displayName: meta.displayName,
+      role: meta.role,
+      orb: meta.orb,
+      avatarDataUri: loadAvatar(this.serverFingerprint, profileName),
+    };
+    this.bots.set(profileName, updated);
+    this.push({ type: 'bot.updated', bot: updated });
+  }
+
+  // --- avatars -------------------------------------------------------------
+
+  /** Opens the native picker in main; the renderer never supplies a path. */
+  async pickAvatarImage(): Promise<string | null> {
+    return await pickAvatar(this.window);
+  }
+
+  async setAvatar(profileName: string, dataUri: string): Promise<string> {
+    const uri = await saveAvatar(this.serverFingerprint, profileName, dataUri);
+    this.republishBot(profileName);
+    return uri;
+  }
+
+  async removeAvatar(profileName: string): Promise<void> {
+    await clearAvatar(this.serverFingerprint, profileName);
+    this.republishBot(profileName);
   }
 
   async createBot(input: {
@@ -515,6 +547,8 @@ export class AppController {
     await this.rest.deleteProfile(profileName);
     this.bots.delete(profileName);
     this.threads.delete(profileName);
+    // Local presentation data outlives Hermes state unless we clean it up.
+    await clearAvatar(this.serverFingerprint, profileName);
     await this.refreshBots();
   }
 

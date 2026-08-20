@@ -66,7 +66,9 @@ export function ChatView({
         </>
       ) : (
         <div className="empty-state">
-          {bot ? <PersonaOrb orb={bot.orb} size={72} title={bot.displayName} /> : null}
+          {bot ? (
+            <PersonaOrb orb={bot.orb} size={72} title={bot.displayName} avatar={bot.avatarDataUri} />
+          ) : null}
           <div className="es-title">{bot?.displayName ?? profile}</div>
           <div className="es-sub">{bot?.role ?? bot?.description ?? 'Start a new thread below.'}</div>
           <div className="starter-row">

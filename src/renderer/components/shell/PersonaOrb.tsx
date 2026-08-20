@@ -25,12 +25,38 @@ export function PersonaOrb({
   orb,
   size = 42,
   title,
+  avatar,
 }: {
   orb: OrbDefinition;
   size?: number;
   title?: string;
+  /** Local `data:` URI picture; replaces the generated mark when present. */
+  avatar?: string;
 }): React.JSX.Element {
   const color = orbColor(orb);
+
+  // A chosen picture wins over the generated emblem. Circular crop with
+  // cover-fit so non-square sources still fill the disc cleanly.
+  if (avatar) {
+    return (
+      <img
+        src={avatar}
+        alt={title ?? ''}
+        width={size}
+        height={size}
+        draggable={false}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          display: 'block',
+          // Keeps light photos from bleeding into light surfaces.
+          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.28)',
+        }}
+      />
+    );
+  }
   const h = hash(orb.seed);
   // Geometry is authored in a 100×100 space and scaled by `size`.
   const C = 50;

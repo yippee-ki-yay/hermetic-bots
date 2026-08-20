@@ -22,6 +22,8 @@ interface WizardData {
   role: string;
   description: string;
   orb: OrbDefinition;
+  /** Chosen picture, applied after the profile exists. */
+  avatarDataUri?: string;
   startingPoint: 'blank' | 'clone';
   cloneFrom: string | null;
   soul: string;
@@ -41,6 +43,7 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
   const navigate = useStore((s) => s.navigate);
   const bots = useStore((s) => s.bots);
   const toast = useStore((s) => s.toast);
+  const reportError = useStore((s) => s.reportError);
   const [data, setData] = useState<WizardData>(() => ({
     name: '',
     displayName: '',
@@ -109,6 +112,15 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
       );
       let telegram: { ok: boolean; error?: PublicError } | undefined;
       const profileCreated = result.steps.find((s) => s.step === 'profile')?.ok;
+      // Local presentation data: apply once the profile exists, and never let
+      // it fail the wizard.
+      if (profileCreated && data.avatarDataUri) {
+        try {
+          await unwrap(api().avatar.set(data.name, data.avatarDataUri));
+        } catch {
+          toast('Bot created, but the picture could not be saved');
+        }
+      }
       if (profileCreated && !data.telegramSkipped && data.telegramToken.trim()) {
         try {
           await unwrap(
@@ -220,7 +232,48 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                   </div>
                 </div>
                 <div className="card">
-                  <h3>Constellation orb</h3>
+                  <h3>Picture</h3>
+                  <div className="orb-editor">
+                    <div className="orb-preview">
+                      <PersonaOrb
+                        orb={{ ...data.orb, seed: data.name || data.orb.seed }}
+                        size={84}
+                        avatar={data.avatarDataUri}
+                      />
+                    </div>
+                    <div className="orb-controls">
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className="btn"
+                          onClick={async () => {
+                            try {
+                              const picked = await unwrap(api().avatar.pick());
+                              if (picked) set({ avatarDataUri: picked });
+                            } catch (err) {
+                              reportError(err, 'Could not read that image');
+                            }
+                          }}
+                        >
+                          {data.avatarDataUri ? 'Change picture' : 'Upload picture'}
+                        </button>
+                        {data.avatarDataUri ? (
+                          <button className="btn ghost" onClick={() => set({ avatarDataUri: undefined })}>
+                            Use generated mark
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className="hint">
+                        Optional. Without a picture the bot gets the generated constellation mark
+                        below, which stays unique per bot.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className="card"
+                  style={data.avatarDataUri ? { opacity: 0.55 } : undefined}
+                >
+                  <h3>Generated mark</h3>
                   <div className="orb-editor">
                     <div className="orb-preview">
                       <PersonaOrb orb={{ ...data.orb, seed: data.name || data.orb.seed }} size={84} />

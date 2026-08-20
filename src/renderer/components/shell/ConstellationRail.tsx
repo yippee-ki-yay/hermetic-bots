@@ -68,7 +68,7 @@ export function ConstellationRail(): React.JSX.Element {
             onClick={() => selectBot(bot.profileName)}
           >
             <span className="orb-figure">
-              <PersonaOrb orb={bot.orb} size={34} />
+              <PersonaOrb orb={bot.orb} size={34} avatar={bot.avatarDataUri} />
               <span className={`orb-status ${statusClass(bot)}`} />
             </span>
             <span className="orb-meta">

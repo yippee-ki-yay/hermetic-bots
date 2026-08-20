@@ -109,6 +109,12 @@ export interface HermesApi {
     setSoul(profileName: string, content: string): Promise<IpcResult<boolean>>;
     setModel(profileName: string, provider: string, model: string): Promise<IpcResult<boolean>>;
   };
+  avatar: {
+    /** Opens the native picker in main; resolves to a processed `data:` URI. */
+    pick(): Promise<IpcResult<string | null>>;
+    set(profileName: string, dataUri: string): Promise<IpcResult<string>>;
+    clear(profileName: string): Promise<IpcResult<boolean>>;
+  };
   threads: {
     list(profileName: string): Promise<IpcResult<ThreadSummary[]>>;
     search(profileName: string, query: string): Promise<IpcResult<ThreadSummary[]>>;

@@ -54,6 +54,11 @@ const api: HermesApi = {
     setModel: (profileName, provider, model) =>
       invoke('bots.setModel', { profileName, provider, model }),
   },
+  avatar: {
+    pick: () => invoke('avatar.pick'),
+    set: (profileName, dataUri) => invoke('avatar.set', { profileName, dataUri }),
+    clear: (profileName) => invoke('avatar.clear', { profileName }),
+  },
   threads: {
     list: (profileName) => invoke('threads.list', { profileName }),
     search: (profileName, query) => invoke('threads.search', { profileName, query }),

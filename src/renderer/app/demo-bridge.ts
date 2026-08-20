@@ -24,6 +24,13 @@ function ok<T>(data: T): Promise<IpcResult<T>> {
 const now = Date.now();
 const iso = (msAgo: number): string => new Date(now - msAgo).toISOString();
 
+/** Flat teal square — enough to prove the image path renders and crops. */
+const DEMO_AVATAR =
+  'data:image/svg+xml;base64,' +
+  btoa(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192"><rect width="192" height="192" fill="#2b6f78"/><circle cx="96" cy="74" r="34" fill="#edf5f6"/><path d="M28 192c0-38 30-62 68-62s68 24 68 62z" fill="#edf5f6"/></svg>',
+  );
+
 export function createDemoBridge(): HermesApi {
   const listeners = new Set<(e: PushEnvelope) => void>();
   const emit = (event: PushEnvelope['event']): void => {
@@ -376,6 +383,29 @@ export function createDemoBridge(): HermesApi {
         }),
       setSoul: () => ok(true),
       setModel: () => ok(true),
+    },
+    avatar: {
+      // No native dialog outside Electron; demo mode paints a stand-in so the
+      // picture path is still reviewable in a browser.
+      pick: () => ok(DEMO_AVATAR),
+      set: (profileName, dataUri) => {
+        const bot = bots.find((b) => b.profileName === profileName);
+        if (bot) {
+          const updated = { ...bot, avatarDataUri: dataUri };
+          bots.splice(bots.indexOf(bot), 1, updated);
+          emit({ type: 'bot.updated', bot: updated });
+        }
+        return ok(dataUri);
+      },
+      clear: (profileName) => {
+        const bot = bots.find((b) => b.profileName === profileName);
+        if (bot) {
+          const updated = { ...bot, avatarDataUri: undefined };
+          bots.splice(bots.indexOf(bot), 1, updated);
+          emit({ type: 'bot.updated', bot: updated });
+        }
+        return ok(true);
+      },
     },
     threads: {
       list: (profileName) => ok(threads.get(profileName) ?? []),

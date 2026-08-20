@@ -46,6 +46,7 @@ export function BotDetails({ profile, tab }: { profile: string; tab: BotTab }): 
   const [logLevel, setLogLevel] = useState<'all' | 'warn' | 'error'>('all');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRemoveToken, setConfirmRemoveToken] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   useEffect(() => {
     setConfig(null);
@@ -125,12 +126,53 @@ export function BotDetails({ profile, tab }: { profile: string; tab: BotTab }): 
       <div className="center-view" style={{ paddingTop: 24 }}>
         <div className="center-col">
           <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            {bot ? <PersonaOrb orb={bot.orb} size={56} /> : null}
-            <div>
+            {bot ? <PersonaOrb orb={bot.orb} size={56} avatar={bot.avatarDataUri} /> : null}
+            <div style={{ minWidth: 0 }}>
               <div className="view-title">{bot?.displayName ?? profile}</div>
               <div className="view-sub" style={{ marginTop: 2 }}>
                 {bot?.role ?? ''} · profile <span style={{ fontFamily: 'var(--font-mono)' }}>{profile}</span>
               </div>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button
+                className="btn"
+                disabled={avatarBusy}
+                onClick={async () => {
+                  setAvatarBusy(true);
+                  try {
+                    const picked = await unwrap(api().avatar.pick());
+                    if (picked) {
+                      await unwrap(api().avatar.set(profile, picked));
+                      toast('Picture updated');
+                    }
+                  } catch (err) {
+                    reportError(err, 'Could not set the picture');
+                  } finally {
+                    setAvatarBusy(false);
+                  }
+                }}
+              >
+                {bot?.avatarDataUri ? 'Change picture' : 'Upload picture'}
+              </button>
+              {bot?.avatarDataUri ? (
+                <button
+                  className="btn ghost"
+                  disabled={avatarBusy}
+                  onClick={async () => {
+                    setAvatarBusy(true);
+                    try {
+                      await unwrap(api().avatar.clear(profile));
+                      toast('Picture removed');
+                    } catch (err) {
+                      reportError(err, 'Could not remove the picture');
+                    } finally {
+                      setAvatarBusy(false);
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              ) : null}
             </div>
           </div>
 

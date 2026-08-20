@@ -16,6 +16,7 @@ import {
   renameSessionSchema,
   orbMetadataSchema,
   deleteProfileSchema,
+  avatarSetSchema,
 } from '@shared/schemas';
 import { AppError, publicError } from '@shared/errors';
 import type { AppController } from '../controller';
@@ -65,6 +66,19 @@ export function registerHermesIpc(controller: AppController): void {
 
   handle('bots.setOrb', orbMetadataSchema, ({ profileName, displayName, role, orb }) => {
     controller.setOrbMetadata(profileName, { displayName, role, orb });
+    return true;
+  });
+
+  // Avatar picking happens entirely in main: the renderer asks for a dialog
+  // and receives processed image bytes, never a filesystem path.
+  handle('avatar.pick', null, () => controller.pickAvatarImage());
+
+  handle('avatar.set', avatarSetSchema, ({ profileName, dataUri }) =>
+    controller.setAvatar(profileName, dataUri),
+  );
+
+  handle('avatar.clear', z.object({ profileName: profileNameSchema }), async ({ profileName }) => {
+    await controller.removeAvatar(profileName);
     return true;
   });
 

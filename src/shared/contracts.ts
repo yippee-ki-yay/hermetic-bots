@@ -98,6 +98,8 @@ export interface BotSummary {
   role?: string;
   description?: string;
   orb: OrbDefinition;
+  /** User-chosen picture as a local `data:` URI; falls back to the orb mark. */
+  avatarDataUri?: string;
   provider?: string;
   model?: string;
   runState: BotRunState;
