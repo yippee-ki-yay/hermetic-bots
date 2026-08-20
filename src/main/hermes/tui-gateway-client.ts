@@ -36,7 +36,11 @@ export class TuiGatewayClient extends EventEmitter {
   private reconnectAttempt = 0;
   private knownMissingMethods = new Set<string>();
 
-  constructor(private readonly getPort: () => number | null) {
+  constructor(
+    private readonly getPort: () => number | null,
+    /** Loopback session token for the `?token=` WS upgrade auth (may be null). */
+    private readonly getToken: () => string | null = () => null,
+  ) {
     super();
   }
 
@@ -94,8 +98,9 @@ export class TuiGatewayClient extends EventEmitter {
   private open(): void {
     const port = this.getPort();
     if (!port || this.ws) return;
-    const url = `ws://127.0.0.1:${port}/api/ws`;
-    log.info('ws', `connecting ${url}`);
+    const token = this.getToken();
+    const url = `ws://127.0.0.1:${port}/api/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    log.info('ws', `connecting ws://127.0.0.1:${port}/api/ws`);
     const ws = new WebSocket(url, { handshakeTimeout: 15_000 });
     this.ws = ws;
 

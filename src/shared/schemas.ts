@@ -76,7 +76,8 @@ export const secretResponseSchema = z.object({
 export const sudoResponseSchema = z.object({
   sessionId: sessionIdSchema,
   requestId: z.string().min(1).max(128),
-  approve: z.boolean(),
+  /** Sudo password forwarded straight to the gateway; empty string cancels. */
+  password: z.string().max(1024),
 });
 
 export const telegramConfigSchema = z.object({
@@ -117,6 +118,7 @@ export const preferencesSchema = z.object({
   notifyConnectionFailures: z.boolean(),
   reconnectOnLaunch: z.boolean(),
   theme: z.enum(['system', 'dark']),
+  showThreadDeck: z.boolean().default(false),
 });
 
 export const orbMetadataSchema = z.object({

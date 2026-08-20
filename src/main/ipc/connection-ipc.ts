@@ -43,6 +43,11 @@ export function registerConnectionIpc(controller: AppController): void {
     return controller.connectionSummary();
   });
 
+  handle('connection.sync', null, async () => {
+    await controller.pushFullState();
+    return true;
+  });
+
   handle('connection.disconnect', null, async () => {
     await controller.disconnect();
     return controller.connectionSummary();

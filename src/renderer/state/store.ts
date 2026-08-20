@@ -63,6 +63,8 @@ interface AppState {
   threadSearch: string;
   paletteOpen: boolean;
   toasts: Toast[];
+  /** True until boot lands somewhere real; lets bots.updated auto-navigate. */
+  bootNavPending: boolean;
 
   boot(): Promise<void>;
   navigate(route: Route): void;
@@ -74,6 +76,7 @@ interface AppState {
   setThreadFilter(f: ThreadFilter): void;
   setThreadSearch(q: string): void;
   setPaletteOpen(open: boolean): void;
+  toggleThreadDeck(): void;
   toast(title: string, message?: string, error?: boolean): void;
   dismissToast(id: number): void;
   reportError(err: unknown, fallback: string): void;
@@ -134,6 +137,7 @@ export const useStore = create<AppState>((set, get) => ({
   threadSearch: '',
   paletteOpen: false,
   toasts: [],
+  bootNavPending: true,
 
   async boot() {
     api().onEvent((envelope) => get().applyEvent(envelope));
@@ -144,6 +148,7 @@ export const useStore = create<AppState>((set, get) => ({
         unwrap(api().route.get()),
       ]);
       const restored = routeFromString(savedRoute);
+      const restoredIsContent = restored?.view === 'chat' || restored?.view === 'bot-settings';
       set({
         booted: true,
         connection: payload.connection,
@@ -153,6 +158,7 @@ export const useStore = create<AppState>((set, get) => ({
         storedConfig: payload.storedConfig,
         prefs,
         route: payload.configured ? (restored ?? { view: 'connection' }) : { view: 'welcome' },
+        bootNavPending: !restoredIsContent,
       });
       if (payload.configured) {
         try {
@@ -171,6 +177,8 @@ export const useStore = create<AppState>((set, get) => ({
           /* not connected yet; events will refresh */
         }
       }
+      // Heal any push events emitted while the renderer was still loading.
+      await unwrap(api().connection.sync()).catch(() => undefined);
     } catch (err) {
       set({ booted: true });
       get().reportError(err, 'Startup failed');
@@ -178,7 +186,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   navigate(route) {
-    set({ route });
+    set({ route, bootNavPending: false });
     void api().route.set(routeToString(route));
     if (route.view === 'chat') {
       const state = get();
@@ -205,9 +213,20 @@ export const useStore = create<AppState>((set, get) => ({
         if (!wasOnline && event.connection.status === 'online') {
           void unwrap(api().bots.list()).then((bots) => {
             set({ bots });
-            const route = get().route;
+            const state = get();
+            const route = state.route;
             if ((route.view === 'welcome' || route.view === 'connection') && bots.length > 0) {
-              get().navigate({ view: 'chat', profile: bots[0]!.profileName, sessionId: null });
+              state.navigate({ view: 'chat', profile: bots[0]!.profileName, sessionId: null });
+              return;
+            }
+            // A route restored from a previous run asked for its threads (and
+            // history) before the tunnel was up; now that we are online, load
+            // what those failed calls could not.
+            if (route.view === 'chat' || route.view === 'bot-settings') {
+              void state.loadThreads(route.profile);
+              if (route.view === 'chat' && route.sessionId) {
+                void state.openSession(route.profile, route.sessionId);
+              }
             }
           }).catch(() => undefined);
         }
@@ -219,9 +238,20 @@ export const useStore = create<AppState>((set, get) => ({
       case 'capabilities':
         set({ capabilities: event.capabilities });
         return;
-      case 'bots.updated':
+      case 'bots.updated': {
         set({ bots: event.bots });
+        const s = get();
+        if (
+          s.bootNavPending &&
+          event.bots.length > 0 &&
+          s.connection?.status === 'online' &&
+          (s.route.view === 'connection' || s.route.view === 'welcome')
+        ) {
+          set({ bootNavPending: false });
+          s.selectBot(event.bots[0]!.profileName);
+        }
         return;
+      }
       case 'bot.updated':
         set({
           bots: get().bots.map((b) => (b.profileName === event.bot.profileName ? event.bot : b)),
@@ -332,7 +362,11 @@ export const useStore = create<AppState>((set, get) => ({
       const threads = await unwrap(api().threads.list(profile));
       set({ threads: { ...get().threads, [profile]: threads } });
     } catch (err) {
-      get().reportError(err, 'Could not load threads');
+      // While the tunnel is still coming up this is expected; the
+      // connection.state handler reloads once we are online.
+      if (get().connection?.status === 'online') {
+        get().reportError(err, 'Could not load threads');
+      }
     }
   },
 
@@ -341,7 +375,9 @@ export const useStore = create<AppState>((set, get) => ({
       const events = await unwrap(api().threads.history(profile, sessionId));
       set({ transcripts: { ...get().transcripts, [sessionId]: events } });
     } catch (err) {
-      get().reportError(err, 'Could not load the conversation');
+      if (get().connection?.status === 'online') {
+        get().reportError(err, 'Could not load the conversation');
+      }
     }
   },
 
@@ -360,6 +396,11 @@ export const useStore = create<AppState>((set, get) => ({
 
   setPaletteOpen(open) {
     set({ paletteOpen: open });
+  },
+
+  toggleThreadDeck() {
+    const prefs = get().prefs;
+    void get().setPrefs({ ...prefs, showThreadDeck: !prefs.showThreadDeck });
   },
 
   toast(title, message, error) {

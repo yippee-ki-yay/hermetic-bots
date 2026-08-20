@@ -79,30 +79,55 @@ button:focus-visible,
   background: var(--rail);
   display: flex;
   flex-direction: column;
-  align-items: center;
   border-right: 1px solid var(--border-subtle);
-  padding-bottom: 12px;
+  padding: 0 10px 12px;
   min-height: 0;
 }
 
 .rail-drag {
-  height: 52px; /* macOS traffic-light inset */
+  height: 44px; /* macOS traffic-light inset */
   width: 100%;
   -webkit-app-region: drag;
   flex: none;
 }
 
+.rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 12px;
+  flex: none;
+}
+
 .rail-monogram {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   display: grid;
   place-items: center;
   color: var(--accent-cyan);
   font-weight: 600;
-  font-size: 17px;
+  font-size: 14px;
   border: 1px solid var(--border-subtle);
-  margin-bottom: 14px;
+  flex: none;
+}
+
+.rail-brand-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.rail-section {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 2px 8px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex: none;
 }
 
@@ -111,10 +136,9 @@ button:focus-visible,
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  gap: 2px;
   width: 100%;
-  padding: 4px 0;
+  padding: 0 0 4px;
   scrollbar-width: none;
   min-height: 0;
 }
@@ -123,13 +147,16 @@ button:focus-visible,
   display: none;
 }
 
+/* Bot roster row: constellation mark + name, Grok-style profile list. */
 .orb-btn {
   position: relative;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-row);
+  text-align: left;
   transition: background var(--t-fast) var(--ease);
   flex: none;
 }
@@ -138,34 +165,79 @@ button:focus-visible,
   background: var(--surface-hover);
 }
 
-.orb-btn.active::before {
-  content: '';
-  position: absolute;
-  inset: 1px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-cyan);
-  border-right-color: transparent;
-  transform: rotate(45deg);
+.orb-btn.active {
+  background: var(--surface-selected);
 }
 
 .orb-btn.active::after {
   content: '';
   position: absolute;
-  left: -15px;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
   width: 2px;
-  height: 22px;
   border-radius: 2px;
   background: var(--accent-cyan);
 }
 
+.orb-figure {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.orb-meta {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+
+.orb-name {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orb-role {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.orb-unread {
+  font-size: 11px;
+  font-weight: 600;
+  color: #06282c;
+  background: var(--accent-cyan);
+  border-radius: 999px;
+  padding: 1px 6px;
+  flex: none;
+}
+
 .orb-status {
   position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 10px;
-  height: 10px;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   border: 2px solid var(--rail);
+}
+
+.orb-btn.active .orb-status {
+  border-color: var(--surface-selected);
 }
 
 .orb-status.s-green { background: var(--success); }
@@ -179,45 +251,77 @@ button:focus-visible,
 }
 
 .rail-add {
-  margin-top: 8px;
-  width: 42px;
-  height: 42px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-row);
+  color: var(--text-secondary);
+  font-size: 13px;
+  transition: color var(--t-fast), background var(--t-fast);
+  flex: none;
+}
+
+.rail-add .rail-add-mark {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: 1px dashed var(--border-strong);
-  color: var(--text-secondary);
   display: grid;
   place-items: center;
-  transition: color var(--t-fast), border-color var(--t-fast);
   flex: none;
 }
 
 .rail-add:hover {
   color: var(--accent-cyan);
+  background: var(--surface-hover);
+}
+
+.rail-add:hover .rail-add-mark {
   border-color: var(--accent-cyan);
 }
 
 .rail-bottom {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
   flex: none;
 }
 
 .rail-icon-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
   color: var(--text-muted);
+  font-size: 12.5px;
   transition: color var(--t-fast), background var(--t-fast);
 }
 
 .rail-icon-btn:hover {
   color: var(--text-primary);
   background: var(--surface-hover);
+}
+
+.rail-icon-btn .rail-icon-slot {
+  width: 34px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.rail-icon-btn .rail-btn-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rail-tooltip {

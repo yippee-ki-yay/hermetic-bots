@@ -58,7 +58,10 @@ export class AppController {
   readonly settings = new SettingsStore();
   private readonly tunnel = new SshTunnelManager();
   private readonly rest = new DashboardClient(() => this.tunnel.localPort);
-  private readonly ws = new TuiGatewayClient(() => this.tunnel.localPort);
+  private readonly ws = new TuiGatewayClient(
+    () => this.tunnel.localPort,
+    () => this.rest.getSessionToken(),
+  );
 
   private window: BrowserWindow | null = null;
   private connectionId = randomUUID();
@@ -107,6 +110,25 @@ export class AppController {
 
   private pushConnection(): void {
     this.push({ type: 'connection.state', connection: this.connectionSummary() });
+  }
+
+  /**
+   * Re-push the current state. The renderer calls this at the end of boot so
+   * any push events emitted while it was still loading are healed rather
+   * than lost (main connects in parallel with renderer startup).
+   */
+  async pushFullState(): Promise<void> {
+    this.pushConnection();
+    this.push({ type: 'capabilities', capabilities: this.capabilities });
+    if (this.tunnel.status === 'online' && this.bots.size === 0) {
+      try {
+        await this.refreshBots();
+        return; // refreshBots already pushed bots.updated
+      } catch {
+        /* not reachable yet; the health loop will recover */
+      }
+    }
+    this.push({ type: 'bots.updated', bots: [...this.bots.values()] });
   }
 
   connectionSummary(): ConnectionSummary {
@@ -237,6 +259,7 @@ export class AppController {
 
   async disconnect(): Promise<void> {
     this.ws.disconnect();
+    this.rest.clearSessionToken();
     await this.tunnel.stop();
     this.stopHealthTimer();
     this.pushConnection();
@@ -297,6 +320,9 @@ export class AppController {
       this.hermesVersion = status.version;
       this.latencyMs = status.latencyMs;
       this.lastCheckedAt = new Date().toISOString();
+      // Loopback dashboards gate the API behind an ephemeral session token
+      // served with the SPA shell; fetch it before touching gated routes.
+      await this.rest.bootstrapSessionToken();
       this.tunnel.markOnline();
       this.lastError = undefined;
       this.serverFingerprint = this.settings.connection?.lastFingerprint ?? `${this.settings.connection?.host}`;
@@ -488,12 +514,20 @@ export class AppController {
   // Sessions / threads
 
   private toThread(s: RestSession, profileName: string): ThreadSummary {
+    // v0.20.x reports epoch-seconds floats; fall back to ISO fields when a
+    // future build supplies them instead.
+    const epoch = s.ended_at ?? s.started_at;
+    const updatedAt =
+      s.updated_at ??
+      (epoch !== undefined ? new Date(epoch * 1000).toISOString() : undefined) ??
+      s.created_at ??
+      new Date().toISOString();
     return {
       id: s.id,
       profileName: s.profile ?? profileName,
       title: s.title?.trim() || 'Untitled thread',
       preview: s.preview,
-      updatedAt: s.updated_at ?? s.created_at ?? new Date().toISOString(),
+      updatedAt,
       state: s.archived ? 'archived' : s.active ? 'active' : 'idle',
       unread: false,
     };
@@ -549,9 +583,15 @@ export class AppController {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    await this.rest.deleteSession(sessionId);
-    this.transcripts.delete(sessionId);
     const profileName = this.sessionProfile.get(sessionId);
+    // Prefer the gateway RPC (it knows about live sessions and refuses to
+    // delete one mid-run); fall back to REST on older builds.
+    try {
+      await this.ws.call('session.delete', { session_id: sessionId, profile: profileName });
+    } catch {
+      await this.rest.deleteSession(sessionId);
+    }
+    this.transcripts.delete(sessionId);
     this.sessionProfile.delete(sessionId);
     if (profileName) await this.refreshThreads(profileName);
   }
@@ -626,8 +666,9 @@ export class AppController {
     };
     this.appendTranscript(userEvent);
 
-    const method =
-      input.mode === 'steer' ? 'session.steer' : input.mode === 'background' ? 'prompt.background' : 'prompt.submit';
+    // v0.20.x: a prompt.submit during an active run steers/queues server-side
+    // (there is no separate session.steer method); background uses its own.
+    const method = input.mode === 'background' ? 'prompt.background' : 'prompt.submit';
     try {
       await this.ws.call(method, {
         session_id: sessionId,
@@ -719,10 +760,12 @@ export class AppController {
 
   async respondApproval(sessionId: string, requestId: string, approve: boolean): Promise<void> {
     this.assertNotAnswered(requestId);
+    // v0.20.x contract: choice is one of the payload's `choices`
+    // ("once"/"session"/"always"/"deny"); we only ever grant once.
     await this.ws.call('approval.respond', {
       session_id: sessionId,
       request_id: requestId,
-      approved: approve,
+      choice: approve ? 'once' : 'deny',
     });
     this.markDecision(sessionId, requestId, approve ? 'approved' : 'denied');
   }
@@ -737,24 +780,26 @@ export class AppController {
     this.markDecision(sessionId, requestId, 'answered');
   }
 
-  async respondSudo(sessionId: string, requestId: string, approve: boolean): Promise<void> {
+  /** v0.20.x contract: sudo.respond carries the password; empty cancels. */
+  async respondSudo(sessionId: string, requestId: string, password: string): Promise<void> {
     this.assertNotAnswered(requestId);
+    if (password) registerSecret(password); // never allow it into logs
     await this.ws.call('sudo.respond', {
       session_id: sessionId,
       request_id: requestId,
-      approved: approve,
+      password,
     });
-    this.markDecision(sessionId, requestId, approve ? 'approved' : 'denied');
+    this.markDecision(sessionId, requestId, password ? 'answered' : 'denied');
   }
 
   async respondSecret(sessionId: string, requestId: string, value: string, cancelled: boolean): Promise<void> {
     this.assertNotAnswered(requestId);
-    if (!cancelled) registerSecret(value); // never allow it into logs
+    if (!cancelled && value) registerSecret(value); // never allow it into logs
+    // v0.20.x contract: {request_id, value}; empty value cancels.
     await this.ws.call('secret.respond', {
       session_id: sessionId,
       request_id: requestId,
-      value: cancelled ? undefined : value,
-      cancelled,
+      value: cancelled ? '' : value,
     });
     this.markDecision(sessionId, requestId, cancelled ? 'denied' : 'answered');
   }

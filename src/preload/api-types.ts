@@ -46,6 +46,8 @@ export interface HermesApi {
     get(): Promise<IpcResult<ConnectionStatePayload>>;
     connect(config: ConnectInput): Promise<IpcResult<ConnectionSummary>>;
     reconnect(): Promise<IpcResult<ConnectionSummary>>;
+    /** Ask main to re-push current state; heals events missed during load. */
+    sync(): Promise<IpcResult<boolean>>;
     disconnect(): Promise<IpcResult<ConnectionSummary>>;
     confirmHostKey(accept: boolean): Promise<IpcResult<ConnectionSummary>>;
     test(): Promise<IpcResult<ConnectionSummary>>;
@@ -131,7 +133,8 @@ export interface HermesApi {
   approvals: {
     respondApproval(sessionId: string, requestId: string, approve: boolean): Promise<IpcResult<boolean>>;
     respondClarify(sessionId: string, requestId: string, answer: string): Promise<IpcResult<boolean>>;
-    respondSudo(sessionId: string, requestId: string, approve: boolean): Promise<IpcResult<boolean>>;
+    /** Sends the sudo password to the gateway; empty string cancels. */
+    respondSudo(sessionId: string, requestId: string, password: string): Promise<IpcResult<boolean>>;
     respondSecret(
       sessionId: string,
       requestId: string,

@@ -7,9 +7,20 @@
 import { z } from 'zod';
 import { AppError, publicError } from '@shared/errors';
 import { log, recordDiagnostic } from '../logging/logger';
-import { redact } from '../logging/redaction';
+import { redact, registerSecret } from '../logging/redaction';
 
 const TIMEOUT_MS = 20_000;
+
+/**
+ * Loopback-mode dashboard auth (Hermes v0.20.x): with the dashboard bound to
+ * the VPS loopback, the SSH tunnel is the security boundary and the SPA HTML
+ * carries an ephemeral session token (`window.__HERMES_SESSION_TOKEN__`)
+ * echoed back on REST via this header and on WS upgrades via `?token=`.
+ * The token rotates when the dashboard restarts, so a 401 triggers one
+ * re-bootstrap + retry. Gated (non-loopback OAuth) deployments are detected
+ * and reported as unsupported rather than half-working.
+ */
+const SESSION_HEADER = 'X-Hermes-Session-Token';
 
 export interface RestProfile {
   name: string;
@@ -24,12 +35,12 @@ export interface RestProfile {
 const profileSchema = z
   .object({
     name: z.string(),
-    description: z.string().optional(),
-    provider: z.string().optional(),
-    model: z.string().optional(),
-    active: z.boolean().optional(),
-    path: z.string().optional(),
-    working_dir: z.string().optional(),
+    description: z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined),
+    provider: z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined),
+    model: z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined),
+    active: z.union([z.boolean(), z.number(), z.null()]).optional().transform((v) => (v == null ? undefined : Boolean(v))),
+    path: z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined),
+    working_dir: z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined),
   })
   .loose();
 
@@ -44,29 +55,50 @@ export interface RestSession {
   preview?: string;
   updated_at?: string;
   created_at?: string;
+  /** Hermes v0.20.x reports epoch-seconds floats, not ISO strings. */
+  started_at?: number;
+  ended_at?: number;
   profile?: string;
   active?: boolean;
   archived?: boolean;
   message_count?: number;
 }
 
+/**
+ * Sessions come back with ~58 columns straight from Hermes' state DB, where
+ * most optional values are `null` rather than absent, `archived` may be 0/1,
+ * and timestamps are epoch floats. Accept all of that rather than rejecting a
+ * legitimate response — unknown extra columns are ignored.
+ */
+const nullableString = z.union([z.string(), z.null()]).optional().transform((v) => v ?? undefined);
+const nullableNumber = z.union([z.number(), z.null()]).optional().transform((v) => v ?? undefined);
+const looseBool = z
+  .union([z.boolean(), z.number(), z.null()])
+  .optional()
+  .transform((v) => (v === null || v === undefined ? undefined : Boolean(v)));
+
 const sessionSchema = z
   .object({
     id: z.union([z.string(), z.number()]).transform((v) => String(v)),
-    title: z.string().optional(),
-    preview: z.string().optional(),
-    updated_at: z.string().optional(),
-    created_at: z.string().optional(),
-    profile: z.string().optional(),
-    active: z.boolean().optional(),
-    archived: z.boolean().optional(),
-    message_count: z.number().optional(),
+    title: nullableString,
+    preview: nullableString,
+    updated_at: nullableString,
+    created_at: nullableString,
+    started_at: nullableNumber,
+    ended_at: nullableNumber,
+    profile: nullableString,
+    active: looseBool,
+    archived: looseBool,
+    message_count: nullableNumber,
   })
   .loose();
 
 const sessionsResponseSchema = z.union([
   z.array(sessionSchema),
   z.object({ sessions: z.array(sessionSchema) }).loose(),
+  // /api/profiles/sessions/sidebar nests them under `recents` alongside
+  // cron/messaging/errors panels we do not consume here.
+  z.object({ recents: z.object({ sessions: z.array(sessionSchema) }).loose() }).loose(),
 ]);
 
 const statusResponseSchema = z
@@ -92,7 +124,55 @@ export interface CreateProfileRequest {
 }
 
 export class DashboardClient {
+  private sessionToken: string | null = null;
+
   constructor(private readonly getPort: () => number | null) {}
+
+  getSessionToken(): string | null {
+    return this.sessionToken;
+  }
+
+  clearSessionToken(): void {
+    this.sessionToken = null;
+  }
+
+  /** Fetch the SPA shell and extract the loopback session token. */
+  async bootstrapSessionToken(): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(new URL('/', this.base()), { signal: controller.signal });
+      const html = await res.text();
+      const match = html.match(/__HERMES_SESSION_TOKEN__="([^"]+)"/);
+      if (match?.[1]) {
+        this.sessionToken = match[1];
+        registerSecret(this.sessionToken); // never allow it into logs
+        log.info('rest', 'dashboard session token bootstrapped');
+        return;
+      }
+      if (/__HERMES_AUTH_REQUIRED__\s*=\s*true/.test(html)) {
+        throw new AppError(
+          publicError(
+            'hermes/schema-mismatch',
+            'Gated dashboard not supported',
+            'This Hermes dashboard runs in gated (OAuth) mode. The app currently supports loopback deployments reached over SSH; keep the dashboard bound to 127.0.0.1.',
+            false,
+          ),
+        );
+      }
+      // No token and not gated: older builds without loopback token auth.
+      this.sessionToken = null;
+      log.info('rest', 'dashboard exposes no session token; proceeding without');
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      const diag = recordDiagnostic('rest', `token bootstrap failed: ${(err as Error).message}`);
+      throw new AppError(
+        publicError('hermes/unavailable', 'Hermes unreachable', 'Could not load the dashboard shell through the tunnel.', true, diag),
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   private base(): string {
     const port = this.getPort();
@@ -108,6 +188,7 @@ export class DashboardClient {
     method: string,
     path: string,
     opts: { body?: unknown; profile?: string; schema?: z.ZodType<T> } = {},
+    isRetryAfter401 = false,
   ): Promise<T> {
     const url = new URL(path, this.base());
     if (opts.profile) url.searchParams.set('profile', opts.profile);
@@ -115,9 +196,12 @@ export class DashboardClient {
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     let res: Response;
     try {
+      const headers: Record<string, string> = {};
+      if (opts.body !== undefined) headers['content-type'] = 'application/json';
+      if (this.sessionToken) headers[SESSION_HEADER] = this.sessionToken;
       res = await fetch(url, {
         method,
-        headers: opts.body !== undefined ? { 'content-type': 'application/json' } : undefined,
+        headers,
         body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
         signal: controller.signal,
       });
@@ -128,6 +212,13 @@ export class DashboardClient {
       );
     } finally {
       clearTimeout(timer);
+    }
+
+    if (res.status === 401 && !isRetryAfter401) {
+      // The loopback token rotates on dashboard restart; refresh it once.
+      log.warn('rest', `${method} ${path} -> 401; re-bootstrapping session token`);
+      await this.bootstrapSessionToken();
+      return this.request(method, path, opts, true);
     }
 
     if (!res.ok) {
@@ -236,7 +327,7 @@ export class DashboardClient {
       profile,
       schema: sessionsResponseSchema,
     });
-    return Array.isArray(data) ? data : data.sessions;
+    return unwrapSessions(data);
   }
 
   async sidebarSessions(profile?: string): Promise<RestSession[] | null> {
@@ -245,7 +336,7 @@ export class DashboardClient {
         profile,
         schema: sessionsResponseSchema,
       });
-      return Array.isArray(data) ? data : data.sessions;
+      return unwrapSessions(data);
     } catch {
       return null; // fall back to /api/sessions
     }
@@ -260,7 +351,7 @@ export class DashboardClient {
     const data = await this.request('GET', url.pathname + url.search, {
       schema: sessionsResponseSchema,
     });
-    return Array.isArray(data) ? data : data.sessions;
+    return unwrapSessions(data);
   }
 
   async getMessages(sessionId: string): Promise<unknown[]> {
@@ -355,13 +446,28 @@ export class DashboardClient {
       if (profile) url.searchParams.set('profile', profile);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(url, { method: 'GET', signal: controller.signal });
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: this.sessionToken ? { [SESSION_HEADER]: this.sessionToken } : undefined,
+        signal: controller.signal,
+      });
       clearTimeout(timer);
-      return res.status < 500 && res.status !== 404;
+      return res.status < 500 && res.status !== 404 && res.status !== 401;
     } catch {
       return false;
     }
   }
+}
+
+/**
+ * Accept the array, `{sessions}`, and sidebar `{recents:{sessions}}` shapes.
+ * The schema validated the contents already; the loose catchall just erases
+ * the static field types, so read them back positionally.
+ */
+function unwrapSessions(data: z.infer<typeof sessionsResponseSchema>): RestSession[] {
+  if (Array.isArray(data)) return data as RestSession[];
+  const obj = data as { sessions?: RestSession[]; recents?: { sessions?: RestSession[] } };
+  return obj.sessions ?? obj.recents?.sessions ?? [];
 }
 
 function friendlyHttpMessage(status: number): string {

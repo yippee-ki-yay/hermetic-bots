@@ -177,13 +177,16 @@ export function SudoPanel({
 }): React.JSX.Element {
   const reportError = useStore((s) => s.reportError);
   const connection = useStore((s) => s.connection);
+  // Local component state only; never written to the store or persistence.
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = event.decision === 'pending';
 
-  const respond = async (approve: boolean): Promise<void> => {
+  const respond = async (value: string): Promise<void> => {
     setBusy(true);
     try {
-      await unwrap(api().approvals.respondSudo(event.sessionId, event.requestId, approve));
+      await unwrap(api().approvals.respondSudo(event.sessionId, event.requestId, value));
+      setPassword('');
     } catch (err) {
       reportError(err, 'Response failed');
     } finally {
@@ -192,28 +195,36 @@ export function SudoPanel({
   };
 
   return (
-    <section className={`request-panel ${pending ? '' : 'decided'}`} id={`evt-${event.id}`} aria-label="Sudo request">
+    <section className={`request-panel ${pending ? '' : 'decided'}`} id={`evt-${event.id}`} aria-label="Sudo password request">
       <div className="rp-kind">
         <Icon name="terminal" size={14} />
-        Elevated command
+        Sudo password
         <ScopeLine profileName={event.profileName} currentProfile={currentProfile} serverLabel={connection?.label} />
       </div>
-      <div className="rp-summary">
-        The agent wants to run an elevated command on the server:
-      </div>
-      <div className="rp-detail">{event.commandSummary}</div>
+      <div className="rp-summary">{event.commandSummary}</div>
       <div className="rp-summary" style={{ color: 'var(--accent-amber)', fontSize: 13 }}>
-        This runs with root privileges. Deny unless you expected it.
+        This grants root privileges for the pending command. Cancel unless you expected it.
       </div>
       {pending ? (
-        <div className="rp-actions">
-          <button className="btn" disabled={busy} onClick={() => void respond(false)}>
-            Deny
-          </button>
-          <button className="btn warn" disabled={busy} onClick={() => void respond(true)}>
-            Allow once
-          </button>
-        </div>
+        <>
+          <input
+            type="password"
+            placeholder="Sudo password"
+            value={password}
+            disabled={busy}
+            autoComplete="off"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="rp-actions">
+            <button className="btn" disabled={busy} onClick={() => void respond('')}>
+              Cancel
+            </button>
+            <button className="btn warn" disabled={busy || !password} onClick={() => void respond(password)}>
+              Provide password once
+            </button>
+          </div>
+          <div className="rp-decision">Sent directly to the gateway; never stored or logged by this app.</div>
+        </>
       ) : (
         <DecisionLine decision={event.decision} />
       )}

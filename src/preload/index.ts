@@ -15,6 +15,7 @@ const api: HermesApi = {
     get: () => invoke('connection.get'),
     connect: (config) => invoke('connection.connect', config),
     reconnect: () => invoke('connection.reconnect'),
+    sync: () => invoke('connection.sync'),
     disconnect: () => invoke('connection.disconnect'),
     confirmHostKey: (accept) => invoke('connection.confirmHostKey', { accept }),
     test: () => invoke('connection.test'),
@@ -73,8 +74,8 @@ const api: HermesApi = {
       invoke('approval.respond', { sessionId, requestId, approve }),
     respondClarify: (sessionId, requestId, answer) =>
       invoke('clarify.respond', { sessionId, requestId, answer }),
-    respondSudo: (sessionId, requestId, approve) =>
-      invoke('sudo.respond', { sessionId, requestId, approve }),
+    respondSudo: (sessionId, requestId, password) =>
+      invoke('sudo.respond', { sessionId, requestId, password }),
     respondSecret: (sessionId, requestId, value, cancelled) =>
       invoke('secret.respond', { sessionId, requestId, value, cancelled }),
   },

@@ -40,6 +40,23 @@ export function SettingsView(): React.JSX.Element {
           </div>
 
           <div className="card">
+            <h3>Layout</h3>
+            <div className="toggle-row">
+              <div>
+                <div className="tr-title">Show the thread panel</div>
+                <div className="tr-desc">
+                  Off by default so the work log gets full width. Toggle any time with ⌘B.
+                </div>
+              </div>
+              <Switch
+                on={prefs.showThreadDeck}
+                label="Show thread panel"
+                onChange={(v) => void setPrefs({ ...prefs, showThreadDeck: v })}
+              />
+            </div>
+          </div>
+
+          <div className="card">
             <h3>Composer</h3>
             <div className="toggle-row">
               <div>

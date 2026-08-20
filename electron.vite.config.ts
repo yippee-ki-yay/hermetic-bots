@@ -22,7 +22,18 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [react()],
+    plugins: [
+      react(),
+      {
+        // Dev-only: the React fast-refresh preamble is an inline script, so
+        // relax script-src for the dev server. Production keeps strict CSP.
+        name: 'dev-csp-relax',
+        apply: 'serve',
+        transformIndexHtml(html: string) {
+          return html.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'");
+        },
+      },
+    ],
     resolve: {
       alias: { '@shared': resolve(__dirname, 'src/shared') },
     },

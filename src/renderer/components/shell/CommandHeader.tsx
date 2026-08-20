@@ -27,6 +27,9 @@ export function CommandHeader({
   const navigate = useStore((s) => s.navigate);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
+  const showThreadDeck = useStore((s) => s.prefs.showThreadDeck);
+  const toggleThreadDeck = useStore((s) => s.toggleThreadDeck);
+
   const bot = bots.find((b) => b.profileName === profile);
   const thread = threads?.find((t) => t.id === sessionId);
 
@@ -56,6 +59,15 @@ export function CommandHeader({
 
   return (
     <header className="cmd-header">
+      <button
+        className="icon-btn"
+        aria-label={showThreadDeck ? 'Hide threads (⌘B)' : 'Show threads (⌘B)'}
+        aria-pressed={showThreadDeck}
+        title={showThreadDeck ? 'Hide threads ⌘B' : 'Show threads ⌘B'}
+        onClick={toggleThreadDeck}
+      >
+        <Icon name={showThreadDeck ? 'panel-close' : 'panel-open'} size={18} />
+      </button>
       <div className="crumb">
         <div className="crumb-path">
           {bot?.displayName ?? profile}
@@ -76,6 +88,14 @@ export function CommandHeader({
         </div>
       </div>
       {bot?.model ? <span className="usage-meter">{bot.model}</span> : null}
+      <button
+        className="icon-btn"
+        aria-label="New thread (⌘N)"
+        title="New thread ⌘N"
+        onClick={() => navigate({ view: 'chat', profile, sessionId: null })}
+      >
+        <Icon name="plus" size={18} />
+      </button>
       <button className="conn-capsule" onClick={() => navigate({ view: 'connection' })} aria-label={`Connection ${connLabel}, ${connection?.status ?? 'unknown'}`}>
         <span className={`conn-dot ${connClass}`} />
         {connLabel}

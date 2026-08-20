@@ -1,8 +1,12 @@
-/** Constellation Rail (spec §7.1): persona orbs + global navigation. */
-import { useState } from 'react';
+/**
+ * Bot roster rail: constellation persona marks paired with the bot name and
+ * role, plus global navigation (spec §7.1, with the expanded-roster layout
+ * requested for v1 so identity reads at a glance rather than on hover).
+ */
 import { useStore } from '../../state/store';
 import { PersonaOrb } from './PersonaOrb';
 import { Icon } from '../common/Icon';
+import { APP_NAME } from '@shared/branding';
 import type { BotSummary } from '@shared/contracts';
 
 function statusClass(bot: BotSummary): string {
@@ -27,8 +31,6 @@ export function ConstellationRail(): React.JSX.Element {
   const connection = useStore((s) => s.connection);
   const selectBot = useStore((s) => s.selectBot);
   const navigate = useStore((s) => s.navigate);
-  const [tooltip, setTooltip] = useState<{ bot: BotSummary; y: number } | null>(null);
-  const [tipTimer, setTipTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const activeProfile =
     route.view === 'chat' || route.view === 'bot-settings' ? route.profile : null;
@@ -36,7 +38,9 @@ export function ConstellationRail(): React.JSX.Element {
   const connDotClass =
     connection?.status === 'online'
       ? 'online'
-      : connection?.status === 'reconnecting' || connection?.status === 'checking-hermes' || connection?.status === 'starting-tunnel'
+      : connection?.status === 'reconnecting' ||
+          connection?.status === 'checking-hermes' ||
+          connection?.status === 'starting-tunnel'
         ? 'reconnecting'
         : connection?.status === 'offline'
           ? 'offline'
@@ -45,16 +49,13 @@ export function ConstellationRail(): React.JSX.Element {
   return (
     <nav className="rail" aria-label="Bots and navigation">
       <div className="rail-drag" />
-      <button
-        className="rail-monogram"
-        aria-label="Hermes Bots home"
-        onClick={() => {
-          const first = bots[0];
-          if (first) selectBot(first.profileName);
-        }}
-      >
-        H
-      </button>
+      <div className="rail-brand">
+        <span className="rail-monogram" aria-hidden="true">
+          H
+        </span>
+        <span className="rail-brand-name">{APP_NAME}</span>
+      </div>
+      <div className="rail-section">Bots</div>
       <div className="rail-orbs" role="list">
         {bots.map((bot, i) => (
           <button
@@ -63,32 +64,38 @@ export function ConstellationRail(): React.JSX.Element {
             className={`orb-btn ${activeProfile === bot.profileName ? 'active' : ''}`}
             aria-label={`${bot.displayName}, ${statusLabel(bot)}`}
             aria-current={activeProfile === bot.profileName ? 'true' : undefined}
-            title=""
+            title={i < 9 ? `${bot.displayName} (⌘${i + 1})` : bot.displayName}
             onClick={() => selectBot(bot.profileName)}
-            onMouseEnter={(e) => {
-              const y = (e.currentTarget as HTMLElement).getBoundingClientRect().top;
-              if (tipTimer) clearTimeout(tipTimer);
-              setTipTimer(setTimeout(() => setTooltip({ bot, y }), 350));
-            }}
-            onMouseLeave={() => {
-              if (tipTimer) clearTimeout(tipTimer);
-              setTooltip(null);
-            }}
-            data-shortcut={i < 9 ? `⌘${i + 1}` : undefined}
           >
-            <PersonaOrb orb={bot.orb} size={42} />
-            <span className={`orb-status ${statusClass(bot)}`} />
+            <span className="orb-figure">
+              <PersonaOrb orb={bot.orb} size={34} />
+              <span className={`orb-status ${statusClass(bot)}`} />
+            </span>
+            <span className="orb-meta">
+              <span className="orb-name">{bot.displayName}</span>
+              {bot.role || bot.model ? (
+                <span className="orb-role">{bot.role ?? bot.model}</span>
+              ) : null}
+            </span>
+            {bot.unreadCount > 0 ? <span className="orb-unread">{bot.unreadCount}</span> : null}
           </button>
         ))}
-        <button
-          className="rail-add"
-          aria-label="Add bot"
-          onClick={() => navigate({ view: 'wizard', step: 0 })}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="8" opacity="0.4" strokeDasharray="3 4" />
-            <path d="M12 8.5v7M8.5 12h7" />
-          </svg>
+        <button className="rail-add" onClick={() => navigate({ view: 'wizard', step: 0 })}>
+          <span className="rail-add-mark" aria-hidden="true">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+            >
+              <circle cx="12" cy="12" r="8" opacity="0.4" strokeDasharray="3 4" />
+              <path d="M12 8.5v7M8.5 12h7" />
+            </svg>
+          </span>
+          New bot
         </button>
       </div>
       <div className="rail-bottom">
@@ -97,22 +104,22 @@ export function ConstellationRail(): React.JSX.Element {
           aria-label={`Connection: ${connection?.status ?? 'not configured'}`}
           onClick={() => navigate({ view: 'connection' })}
         >
-          <span className={`conn-dot ${connDotClass}`} />
+          <span className="rail-icon-slot">
+            <span className={`conn-dot ${connDotClass}`} />
+          </span>
+          <span className="rail-btn-label">{connection?.label ?? 'Connection'}</span>
         </button>
         <button
           className="rail-icon-btn"
           aria-label="Application settings"
           onClick={() => navigate({ view: 'settings' })}
         >
-          <Icon name="settings" size={19} />
+          <span className="rail-icon-slot">
+            <Icon name="settings" size={17} />
+          </span>
+          <span className="rail-btn-label">Settings</span>
         </button>
       </div>
-      {tooltip ? (
-        <div className="rail-tooltip" style={{ left: 92, top: tooltip.y }}>
-          <div className="tt-name">{tooltip.bot.displayName}</div>
-          {tooltip.bot.role ? <div className="tt-role">{tooltip.bot.role}</div> : null}
-        </div>
-      ) : null}
     </nav>
   );
 }

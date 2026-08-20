@@ -19,6 +19,7 @@ export function App(): React.JSX.Element {
   const configured = useStore((s) => s.configured);
   const trustPrompt = useStore((s) => s.trustPrompt);
   const toasts = useStore((s) => s.toasts);
+  const showThreadDeck = useStore((s) => s.prefs.showThreadDeck);
   const boot = useStore((s) => s.boot);
   const navigate = useStore((s) => s.navigate);
   const setPaletteOpen = useStore((s) => s.setPaletteOpen);
@@ -46,6 +47,9 @@ export function App(): React.JSX.Element {
         const r = state.route;
         const profile = r.view === 'chat' || r.view === 'bot-settings' ? r.profile : state.bots[0]?.profileName;
         if (profile) state.navigate({ view: 'chat', profile, sessionId: null });
+      } else if (e.key === 'b') {
+        e.preventDefault();
+        state.toggleThreadDeck();
       } else if (e.key === ',') {
         e.preventDefault();
         state.navigate({ view: 'settings' });
@@ -82,11 +86,15 @@ export function App(): React.JSX.Element {
   } else {
     switch (route.view) {
       case 'chat':
-        deck = <ThreadDeck profile={route.profile} />;
+        // The Thread Deck is collapsed by default; ⌘B or the header control
+        // reveals it without disturbing the transcript.
+        deck = showThreadDeck ? <ThreadDeck profile={route.profile} /> : null;
+        if (!showThreadDeck) shellClass = 'app-shell no-deck';
         workspace = <ChatView profile={route.profile} sessionId={route.sessionId} />;
         break;
       case 'bot-settings':
-        deck = <ThreadDeck profile={route.profile} />;
+        deck = showThreadDeck ? <ThreadDeck profile={route.profile} /> : null;
+        if (!showThreadDeck) shellClass = 'app-shell no-deck';
         workspace = <BotDetails profile={route.profile} tab={route.tab} />;
         break;
       case 'wizard':

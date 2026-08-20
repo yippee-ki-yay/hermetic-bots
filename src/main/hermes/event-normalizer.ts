@@ -61,9 +61,23 @@ export function normalizeFrame(
   raw: Record<string, unknown>,
   ctx: (sessionId: string | undefined) => NormalizerContext | null,
 ): NormalizedFrame {
-  const name = frameEventName(raw);
+  let name = frameEventName(raw);
   if (!name) return { kind: 'ignored' };
-  const p = frameParams(raw);
+  let p = frameParams(raw);
+  // Hermes v0.20.x TUI gateway wraps events as JSON-RPC notifications:
+  //   {method:"event", params:{type, session_id, payload:{...}}}
+  // Unwrap to the inner type + payload, keeping session_id reachable.
+  if (name === 'event') {
+    const envelope = p;
+    const innerName = str(envelope.type);
+    if (!innerName) return { kind: 'ignored' };
+    name = innerName;
+    const payload =
+      envelope.payload && typeof envelope.payload === 'object'
+        ? (envelope.payload as Record<string, unknown>)
+        : {};
+    p = { ...payload, session_id: envelope.session_id };
+  }
   const sessionId =
     str(p.session_id) ?? str(p.sessionId) ?? str(p.session) ?? str(raw.session_id) ?? undefined;
   const context = ctx(sessionId);
@@ -98,28 +112,30 @@ export function normalizeFrame(
       return requestId ? { kind: 'ack', sessionId: sid, requestId } : { kind: 'ignored' };
     }
 
-    case name === 'tool.start': {
+    case name === 'tool.start' || name === 'tool.generating': {
+      const callId = str(p.tool_id) ?? str(p.call_id) ?? str(p.id) ?? randomUUID();
       const event: ToolEvent = {
         ...base,
-        id: `tool-${str(p.call_id) ?? str(p.id) ?? randomUUID()}`,
+        id: `tool-${callId}`,
         kind: 'tool',
-        toolCallId: str(p.call_id) ?? str(p.id) ?? randomUUID(),
-        toolName: str(p.tool) ?? str(p.name) ?? 'tool',
+        toolCallId: callId,
+        toolName: str(p.name) ?? str(p.tool) ?? 'tool',
         status: 'running',
-        inputPreview: bounded(p.input ?? p.args),
+        inputPreview: bounded(p.args ?? p.input ?? p.preview),
       };
       return { kind: 'transcript', event };
     }
 
     case name === 'tool.progress': {
+      const callId = str(p.tool_id) ?? str(p.call_id) ?? str(p.id) ?? randomUUID();
       const event: ToolEvent = {
         ...base,
-        id: `tool-${str(p.call_id) ?? str(p.id) ?? randomUUID()}`,
+        id: `tool-${callId}`,
         kind: 'tool',
-        toolCallId: str(p.call_id) ?? str(p.id) ?? randomUUID(),
-        toolName: str(p.tool) ?? str(p.name) ?? 'tool',
+        toolCallId: callId,
+        toolName: str(p.name) ?? str(p.tool) ?? 'tool',
         status: 'running',
-        outputPreview: bounded(p.output ?? p.progress),
+        outputPreview: bounded(p.output ?? p.progress ?? p.preview),
       };
       return { kind: 'transcript', event };
     }
@@ -127,15 +143,16 @@ export function normalizeFrame(
     case name === 'tool.complete' || name === 'tool.result' || name === 'tool.error': {
       const failed =
         name === 'tool.error' || p.ok === false || str(p.status) === 'error' || p.error !== undefined;
+      const callId = str(p.tool_id) ?? str(p.call_id) ?? str(p.id) ?? randomUUID();
       const event: ToolEvent = {
         ...base,
-        id: `tool-${str(p.call_id) ?? str(p.id) ?? randomUUID()}`,
+        id: `tool-${callId}`,
         kind: 'tool',
-        toolCallId: str(p.call_id) ?? str(p.id) ?? randomUUID(),
-        toolName: str(p.tool) ?? str(p.name) ?? 'tool',
+        toolCallId: callId,
+        toolName: str(p.name) ?? str(p.tool) ?? 'tool',
         status: failed ? 'failed' : 'complete',
         elapsedMs: typeof p.elapsed_ms === 'number' ? p.elapsed_ms : undefined,
-        outputPreview: bounded(p.output ?? p.result),
+        outputPreview: bounded(p.result ?? p.output ?? p.preview),
         errorPreview: failed ? bounded(p.error) : undefined,
       };
       return { kind: 'transcript', event };
@@ -143,13 +160,28 @@ export function normalizeFrame(
 
     case name === 'approval.request': {
       const requestId = str(p.request_id) ?? str(p.requestId) ?? str(p.id) ?? randomUUID();
+      // Real v0.20.x payload carries tool/command detail plus a `choices`
+      // list like ["once","session","always","deny"]; we surface once/deny.
+      const summary =
+        str(p.summary) ??
+        str(p.description) ??
+        str(p.action) ??
+        (str(p.tool) ? `Run tool ${str(p.tool)}` : undefined) ??
+        (str(p.name) ? `Run tool ${str(p.name)}` : undefined) ??
+        str(p.command) ??
+        'Approval requested';
+      const detailSource =
+        p.command ?? p.args ?? p.detail ??
+        Object.fromEntries(
+          Object.entries(p).filter(([k]) => !['request_id', 'session_id', 'choices'].includes(k)),
+        );
       const event: ApprovalEvent = {
         ...base,
         id: `approval-${requestId}`,
         kind: 'approval',
         requestId,
-        summary: redact(str(p.summary) ?? str(p.action) ?? 'Approval requested'),
-        detail: bounded(p.detail ?? p.payload ?? p.command),
+        summary: redact(summary),
+        detail: bounded(detailSource),
         risk: str(p.risk),
         timeoutAt: str(p.timeout_at) ?? str(p.expires_at),
         decision: 'pending',
@@ -173,13 +205,18 @@ export function normalizeFrame(
     }
 
     case name === 'sudo.request': {
+      // Real semantic: the agent hit a sudo prompt and needs the password
+      // (payload is empty apart from request_id); reply via sudo.respond
+      // {request_id, password} — empty password cancels.
       const requestId = str(p.request_id) ?? str(p.requestId) ?? str(p.id) ?? randomUUID();
       const event: SudoRequestEvent = {
         ...base,
         id: `sudo-${requestId}`,
         kind: 'sudo',
         requestId,
-        commandSummary: redact(str(p.command) ?? str(p.summary) ?? 'Elevated command requested'),
+        commandSummary: redact(
+          str(p.command) ?? str(p.summary) ?? 'The agent needs the sudo password to continue an elevated command.',
+        ),
         decision: 'pending',
       };
       return { kind: 'transcript', event };
@@ -207,17 +244,37 @@ export function normalizeFrame(
     }
 
     case name === 'session.status' || name === 'status.update': {
-      const s = str(p.state) ?? str(p.status) ?? '';
+      // v0.20.x payload: {kind, text}. Compaction gets a visible marker;
+      // anything else means the agent is actively doing something.
+      const s = str(p.kind) ?? str(p.state) ?? str(p.status) ?? '';
+      if (/compact/i.test(s)) {
+        const event: SystemEvent = {
+          ...base,
+          id: `sys-${randomUUID()}`,
+          kind: 'system',
+          systemType: 'compression',
+          label: redact((str(p.text) ?? 'Context compressed').slice(0, 200)),
+        };
+        return { kind: 'transcript', event };
+      }
       if (/tool/i.test(s)) return { kind: 'run-state', sessionId: sid, state: 'tool-running' };
-      if (/think|run|generat/i.test(s)) return { kind: 'run-state', sessionId: sid, state: 'thinking' };
       if (/approv|wait/i.test(s)) return { kind: 'run-state', sessionId: sid, state: 'waiting-approval' };
       if (/idle|ready|done|complete/i.test(s)) return { kind: 'run-state', sessionId: sid, state: 'ready' };
-      return { kind: 'ignored' };
+      return { kind: 'run-state', sessionId: sid, state: 'thinking' };
     }
 
-    case name === 'session.updated' || name === 'session.title': {
+    case name === 'session.updated' || name === 'session.title' || name === 'sessions.changed': {
       return { kind: 'session-update', sessionId: sid, title: str(p.title) };
     }
+
+    // Reasoning/thinking streams are the model's private scratchpad; Hermes
+    // surfaces the final answer via message.delta/complete, so these only
+    // drive the run-state indicator rather than transcript content.
+    case name === 'reasoning.delta' || name === 'thinking.delta' || name === 'message.start':
+      return { kind: 'run-state', sessionId: sid, state: 'thinking' };
+
+    case name === 'reasoning.available':
+      return { kind: 'ignored' };
 
     case name === 'session.compressed': {
       const event: SystemEvent = {
@@ -258,6 +315,24 @@ export function normalizeFrame(
 }
 
 /**
+ * Hermes stores message timestamps as epoch-seconds, serialized as a string
+ * (e.g. "1787247904.86"). Fall back to ISO fields for other builds.
+ */
+function historyTimestamp(m: Record<string, unknown>): string {
+  const rawTs = m.timestamp ?? m.created_at ?? m.at;
+  if (typeof rawTs === 'number' && Number.isFinite(rawTs)) {
+    return new Date(rawTs * 1000).toISOString();
+  }
+  if (typeof rawTs === 'string') {
+    const asNumber = Number(rawTs);
+    if (Number.isFinite(asNumber) && asNumber > 0) return new Date(asNumber * 1000).toISOString();
+    const parsed = Date.parse(rawTs);
+    if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
+  }
+  return new Date().toISOString();
+}
+
+/**
  * Normalize a REST history message (GET /api/sessions/:id/messages) into
  * transcript events for initial render.
  */
@@ -269,7 +344,7 @@ export function normalizeHistoryMessage(
   if (!raw || typeof raw !== 'object') return [];
   const m = raw as Record<string, unknown>;
   const role = str(m.role) ?? str(m.type) ?? '';
-  const at = str(m.created_at) ?? str(m.at) ?? new Date().toISOString();
+  const at = historyTimestamp(m);
   const id = `hist-${str(m.id) ?? index}`;
   const base = { sessionId: ctxBase.sessionId, profileName: ctxBase.profileName, at };
   const content =
@@ -313,8 +388,8 @@ export function normalizeHistoryMessage(
         ...base,
         id,
         kind: 'tool',
-        toolCallId: str(m.call_id) ?? id,
-        toolName: str(m.tool) ?? str(m.name) ?? 'tool',
+        toolCallId: str(m.tool_call_id) ?? str(m.call_id) ?? id,
+        toolName: str(m.tool_name) ?? str(m.tool) ?? str(m.name) ?? 'tool',
         status: 'complete',
         outputPreview: bounded(content),
       },

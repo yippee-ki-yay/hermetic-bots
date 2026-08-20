@@ -33,7 +33,9 @@ export type IconName =
   | 'refresh'
   | 'slash'
   | 'paperclip'
-  | 'bolt';
+  | 'bolt'
+  | 'panel-open'
+  | 'panel-close';
 
 const PATHS: Record<IconName, string> = {
   plus: 'M12 5v14M5 12h14',
@@ -67,6 +69,8 @@ const PATHS: Record<IconName, string> = {
   slash: 'M16 4L8 20',
   paperclip: 'M20 11l-8.5 8.5a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7L9.5 17a1.7 1.7 0 0 1-2.4-2.4L15 7',
   bolt: 'M13 2L5 13h5l-1 9 8-11h-5z',
+  'panel-open': 'M4 5h16v14H4zM10 5v14M13.5 9.5l2 2.5-2 2.5',
+  'panel-close': 'M4 5h16v14H4zM10 5v14M7.5 9.5l-2 2.5 2 2.5',
 };
 
 export function Icon({ name, size = 18, className }: IconProps): React.JSX.Element {

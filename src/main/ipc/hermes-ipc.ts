@@ -158,8 +158,8 @@ export function registerHermesIpc(controller: AppController): void {
     return true;
   });
 
-  handle('sudo.respond', sudoResponseSchema, async ({ sessionId, requestId, approve }) => {
-    await controller.respondSudo(sessionId, requestId, approve);
+  handle('sudo.respond', sudoResponseSchema, async ({ sessionId, requestId, password }) => {
+    await controller.respondSudo(sessionId, requestId, password);
     return true;
   });
 

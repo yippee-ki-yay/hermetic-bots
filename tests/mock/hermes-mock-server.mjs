@@ -171,9 +171,14 @@ const server = createServer(async (req, res) => {
 
 const wss = new WebSocketServer({ server, path: '/api/ws' });
 
+/** Emit an event exactly as Hermes v0.20.x does: a JSON-RPC notification
+ * {method:"event", params:{type, session_id, payload}}. */
+function emitEvent(ws, type, sid, payload) {
+  ws.send(JSON.stringify({ jsonrpc: '2.0', method: 'event', params: { type, session_id: sid, payload } }));
+}
+
 wss.on('connection', (ws) => {
   console.log('ws client connected');
-  ws.send(JSON.stringify({ event: 'gateway.ready', params: {} }));
 
   ws.on('message', (data) => {
     let msg;
@@ -208,26 +213,32 @@ wss.on('connection', (ws) => {
         const text = params?.text ?? '';
         messages.get(sid)?.push({ id: Date.now(), role: 'user', content: text, request_id: requestId });
         reply({ ok: true });
-        // Stream a canned response with a tool call in the middle.
-        const messageId = `m-${randomUUID().slice(0, 8)}`;
+        // Stream a canned response with a tool call in the middle, using the
+        // real v0.20.x event envelope and payload field names.
         const chunks = ['Working on it. ', 'Here is what the mock server ', 'streams back for: ', `"${text.slice(0, 60)}"`];
         let i = 0;
         setTimeout(() => {
-          ws.send(JSON.stringify({ event: 'tool.start', params: { session_id: sid, call_id: 'tc1', tool: 'web.search', input: { query: text.slice(0, 40) } } }));
+          emitEvent(ws, 'message.start', sid, {});
+          emitEvent(ws, 'tool.start', sid, { tool_id: 'tc1', name: 'web.search', args: { query: text.slice(0, 40) } });
           setTimeout(() => {
-            ws.send(JSON.stringify({ event: 'tool.complete', params: { session_id: sid, call_id: 'tc1', tool: 'web.search', elapsed_ms: 431, output: '3 results (mock)' } }));
+            emitEvent(ws, 'tool.complete', sid, { tool_id: 'tc1', name: 'web.search', args: {}, result: '3 results (mock)' });
             const timer = setInterval(() => {
               if (i < chunks.length) {
-                ws.send(JSON.stringify({ event: 'message.delta', params: { session_id: sid, message_id: messageId, delta: chunks[i] } }));
+                emitEvent(ws, 'message.delta', sid, { text: chunks[i] });
                 i++;
               } else {
                 clearInterval(timer);
                 const full = chunks.join('');
                 messages.get(sid)?.push({ id: Date.now(), role: 'assistant', content: full });
-                ws.send(JSON.stringify({ event: 'message.complete', params: { session_id: sid, message_id: messageId, text: full } }));
+                emitEvent(ws, 'message.complete', sid, { text: full });
                 // Occasionally request an approval to exercise the panel.
                 if (/approve|delete|write|deploy/i.test(text)) {
-                  ws.send(JSON.stringify({ event: 'approval.request', params: { session_id: sid, request_id: `ap-${randomUUID().slice(0, 6)}`, summary: 'Write file output.md (mock)', detail: 'tool: fs.write\npath: output.md', risk: 'Mutating tool' } }));
+                  emitEvent(ws, 'approval.request', sid, {
+                    request_id: `ap-${randomUUID().slice(0, 6)}`,
+                    tool: 'fs.write',
+                    command: 'write output.md (mock)',
+                    choices: ['once', 'session', 'always', 'deny'],
+                  });
                 }
               }
             }, 180);

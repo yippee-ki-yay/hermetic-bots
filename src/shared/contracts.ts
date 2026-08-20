@@ -342,6 +342,8 @@ export interface AppPreferences {
   notifyConnectionFailures: boolean;
   reconnectOnLaunch: boolean;
   theme: 'system' | 'dark';
+  /** Thread Deck visibility; collapsed by default so chat gets full width. */
+  showThreadDeck: boolean;
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -351,6 +353,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   notifyConnectionFailures: true,
   reconnectOnLaunch: true,
   theme: 'dark',
+  showThreadDeck: false,
 };
 
 // ---------------------------------------------------------------------------

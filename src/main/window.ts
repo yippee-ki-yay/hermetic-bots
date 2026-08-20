@@ -9,7 +9,8 @@ import type { SettingsStore } from './storage/settings-store';
 
 const CSP = [
   "default-src 'none'",
-  "script-src 'self'",
+  // Dev only: vite/react fast-refresh injects an inline preamble script.
+  process.env.ELECTRON_RENDERER_URL ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
   // Inline style attributes only (React style props); no remote styles.
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",

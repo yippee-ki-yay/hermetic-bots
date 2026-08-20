@@ -311,6 +311,10 @@ export function createDemoBridge(): HermesApi {
       get: () => ok(payload),
       connect: () => ok(connection),
       reconnect: () => ok(connection),
+      sync: () => {
+        emit({ type: 'bots.updated', bots });
+        return ok(true);
+      },
       disconnect: () => ok({ ...connection, status: 'idle' as const }),
       confirmHostKey: () => ok(connection),
       test: () => ok(connection),
@@ -467,11 +471,11 @@ export function createDemoBridge(): HermesApi {
         return ok(true);
       },
       respondClarify: () => ok(true),
-      respondSudo: (sessionId, requestId, approve) => {
+      respondSudo: (sessionId, requestId, password) => {
         const list = transcripts.get(sessionId) ?? [];
         const evt = list.find((e) => 'requestId' in e && e.requestId === requestId);
         if (evt && evt.kind === 'sudo') {
-          const updated = { ...evt, decision: approve ? ('approved' as const) : ('denied' as const) };
+          const updated = { ...evt, decision: password ? ('answered' as const) : ('denied' as const) };
           emit({ type: 'transcript.event', event: updated });
         }
         return ok(true);
