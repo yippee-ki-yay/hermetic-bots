@@ -299,6 +299,15 @@ export interface ProfileDetails {
   path?: string;
 }
 
+/** One entry in the bundled persona library (metadata only). */
+export interface PersonaSummary {
+  id: string;
+  name: string;
+  division: string;
+  description: string;
+  vibe: string;
+}
+
 export interface CreateBotInput {
   name: string;
   displayName: string;

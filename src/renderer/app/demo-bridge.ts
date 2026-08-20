@@ -531,6 +531,32 @@ export function createDemoBridge(): HermesApi {
       gateway: (profileName) =>
         ok(telegramState.get(profileName) ?? { configured: false, enabled: false, state: 'disabled' as const }),
     },
+    personas: {
+      // The real catalogue is a main-process resource; demo mode ships a few
+      // entries so the picker is still reviewable in a browser.
+      index: () =>
+        ok({
+          divisions: ['engineering', 'strategy'],
+          personas: [
+            {
+              id: 'engineering-backend-architect',
+              name: 'Backend Architect',
+              division: 'engineering',
+              description: 'Scalable system design, database architecture, and cloud infrastructure.',
+              vibe: 'Designs the systems that hold everything up.',
+            },
+            {
+              id: 'strategy-chief-of-staff',
+              name: 'Chief of Staff',
+              division: 'strategy',
+              description: 'Turns scattered inputs into priorities, drafts, and follow-ups.',
+              vibe: 'Protects your attention.',
+            },
+          ],
+          attribution: { repo: 'msitarzewski/agency-agents', url: '', license: 'MIT' },
+        }),
+      soul: () => ok('# Role\nDemo persona body.\n'),
+    },
     logs: {
       get: () =>
         ok([

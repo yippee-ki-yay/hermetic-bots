@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap } from '../../app/api';
 import { PersonaOrb } from '../../components/shell/PersonaOrb';
+import { PersonaPicker } from './PersonaPicker';
 import { ORB_PALETTE, type OrbDefinition, type CreateBotStepResult } from '@shared/contracts';
 import type { PublicError } from '@shared/errors';
 
@@ -62,6 +63,7 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
     telegramAllowed: '',
     telegramSkipped: false,
   }));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState<{
     profileName?: string;
@@ -173,6 +175,23 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
 
   return (
     <>
+      {pickerOpen ? (
+        <PersonaPicker
+          onClose={() => setPickerOpen(false)}
+          onPick={(persona, soul) => {
+            setPickerOpen(false);
+            // Seed identity too when the user hasn't filled it in yet — the
+            // library entry usually has a better role line than a blank field.
+            set({
+              soul,
+              role: data.role.trim() || persona.name,
+              description: data.description.trim() || persona.description.slice(0, 300),
+              displayName: data.displayName.trim() || persona.name,
+            });
+            toast('Persona inserted', persona.name);
+          }}
+        />
+      ) : null}
       <aside className="wizard-rail" aria-label="Wizard steps">
         {STEPS.map((label, i) => (
           <button
@@ -356,6 +375,9 @@ export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
                 </p>
                 <div className="card">
                   <div className="preset-row">
+                    <button className="btn primary" onClick={() => setPickerOpen(true)}>
+                      Browse persona library…
+                    </button>
                     {Object.keys(SOUL_PRESETS).map((p) => (
                       <button
                         key={p}

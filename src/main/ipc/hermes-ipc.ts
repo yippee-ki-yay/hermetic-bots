@@ -20,6 +20,7 @@ import {
 } from '@shared/schemas';
 import { AppError, publicError } from '@shared/errors';
 import type { AppController } from '../controller';
+import { personaIndex, personaSoul } from '../personas';
 
 export function registerHermesIpc(controller: AppController): void {
   // --- bots ---------------------------------------------------------------
@@ -203,6 +204,12 @@ export function registerHermesIpc(controller: AppController): void {
     z.object({ profileName: profileNameSchema, action: z.enum(['start', 'stop', 'restart']) }),
     ({ profileName, action }) => controller.gatewayAction(profileName, action),
   );
+
+  // --- persona library (bundled; no network at runtime) --------------------
+
+  handle('personas.index', null, () => personaIndex());
+
+  handle('personas.soul', z.object({ id: z.string().max(200) }), ({ id }) => personaSoul(id));
 
   // --- logs ----------------------------------------------------------------
 

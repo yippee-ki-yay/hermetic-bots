@@ -7,6 +7,9 @@ directories:
 files:
   - out/**/*
   - package.json
+  # Persona library, vendored at build time (see scripts/fetch-personas.mjs).
+  # Resolved via app.getAppPath(), so the layout matches dev and packaged.
+  - resources/personas.json
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.icns

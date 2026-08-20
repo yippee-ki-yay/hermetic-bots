@@ -13,6 +13,7 @@ import type {
   HostTrustPrompt,
   LogLine,
   OrbDefinition,
+  PersonaSummary,
   PushEnvelope,
   TelegramStatus,
   ThreadSummary,
@@ -160,6 +161,17 @@ export interface HermesApi {
     }): Promise<IpcResult<TelegramStatus>>;
     test(profileName: string): Promise<IpcResult<{ ok: boolean; message: string }>>;
     gateway(profileName: string, action: 'start' | 'stop' | 'restart'): Promise<IpcResult<TelegramStatus>>;
+  };
+  personas: {
+    /** Metadata for the bundled persona library; bodies load on demand. */
+    index(): Promise<
+      IpcResult<{
+        divisions: string[];
+        personas: PersonaSummary[];
+        attribution?: { repo: string; url: string; license: string };
+      }>
+    >;
+    soul(id: string): Promise<IpcResult<string | null>>;
   };
   logs: {
     get(profileName?: string): Promise<IpcResult<LogLine[]>>;

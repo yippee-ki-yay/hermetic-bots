@@ -25,6 +25,7 @@ import { registerSecret, redact } from './logging/redaction';
 import { log, recordDiagnostic, buildDiagnosticsReport, getLogLines } from './logging/logger';
 import { AppError, publicError, toPublicError, type PublicError } from '@shared/errors';
 import { APP_NAME } from '@shared/branding';
+import { displayNameFor } from '@shared/display-names';
 import type {
   BotSummary,
   Capabilities,
@@ -399,7 +400,7 @@ export class AppController {
   private orbFromMetadata(profileName: string): { displayName: string; role?: string; orb: OrbDefinition } {
     const meta = this.settings.orbFor(this.serverFingerprint, profileName);
     return {
-      displayName: meta?.displayName ?? profileName,
+      displayName: displayNameFor(profileName, meta?.displayName),
       role: meta?.role,
       orb:
         meta?.orb ??
