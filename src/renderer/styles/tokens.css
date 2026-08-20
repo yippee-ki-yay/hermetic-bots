@@ -1,0 +1,46 @@
+/* Hermes Bots visual system (spec §8). Dark theme is the complete MVP theme. */
+:root {
+  --window: #0c1012;
+  --rail: #111719;
+  --deck: #151c1f;
+  --workspace: #0f1416;
+  --surface-elevated: #1b2428;
+  --surface-selected: #223138;
+  --surface-hover: #1d292d;
+  --surface-composer: #182125;
+  --border-strong: #35454b;
+  --border-subtle: rgba(193, 225, 231, 0.11);
+  --text-primary: #edf5f6;
+  --text-secondary: #a2b2b6;
+  --text-muted: #687a7f;
+  --accent-cyan: #68d5df;
+  --accent-amber: #e4ad63;
+  --success: #55c98c;
+  --warning: #e5b96c;
+  --danger: #e87878;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+
+  --rail-w: 84px;
+  --deck-w: 300px;
+  --header-h: 64px;
+
+  --r-search: 9px;
+  --r-row: 10px;
+  --r-card: 12px;
+  --r-composer: 16px;
+
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --t-fast: 140ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+  }
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -16,9 +16,10 @@ const PATTERNS: { name: string; re: RegExp }[] = [
     name: 'private-key',
     re: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g,
   },
-  // Bearer / Authorization headers
-  { name: 'auth-header', re: /\b(authorization|proxy-authorization)\s*[:=]\s*\S+/gi },
+  // Bearer / Authorization headers (bearer first so the token itself goes,
+  // then the whole header value to end of line)
   { name: 'bearer', re: /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/g },
+  { name: 'auth-header', re: /\b(authorization|proxy-authorization)\s*[:=][^\n]*/gi },
   // Common API key shapes
   { name: 'openai-key', re: /\bsk-[A-Za-z0-9_-]{16,}\b/g },
   { name: 'anthropic-key', re: /\bsk-ant-[A-Za-z0-9_-]{16,}\b/g },
