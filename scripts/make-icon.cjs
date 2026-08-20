@@ -1,15 +1,20 @@
 /**
- * Build build/icon.icns (and icon.png) from build/icon.svg.
+ * Build build/icon.icns (and icon.png) for the app.
  *
- * Rasterizing needs a renderer, and Electron already ships one — so load the
- * SVG in an offscreen window, capture it, and downscale with nativeImage.
- * `iconutil` (macOS) assembles the .iconset into the final .icns. No extra
- * image dependencies.
+ * Source, in order of preference:
+ *   1. a path passed on the command line   — npm run icon -- /path/to/art.png
+ *   2. build/icon-source.png               — drop a square export here
+ *   3. build/icon.svg                      — the hand-authored fallback
+ *
+ * Rasterizing an SVG needs a renderer and Electron already ships one, so the
+ * SVG path loads it in an offscreen window and captures it. A supplied bitmap
+ * skips that entirely. `iconutil` (macOS) assembles the .iconset into the
+ * final .icns, so there is no image toolchain to install.
  *
  *   npm run icon
  */
 const { app, BrowserWindow, nativeImage } = require('electron');
-const { readFileSync, writeFileSync, mkdirSync, rmSync } = require('node:fs');
+const { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } = require('node:fs');
 const { join } = require('node:path');
 const { execFileSync } = require('node:child_process');
 
@@ -33,7 +38,32 @@ const VARIANTS = [
 
 app.disableHardwareAcceleration();
 
-app.whenReady().then(async () => {
+/** Load a supplied bitmap, or render build/icon.svg offscreen. */
+async function buildMaster() {
+  const argPath = process.argv.slice(2).find((a) => !a.startsWith('-') && /\.(png|jpg|jpeg|webp)$/i.test(a));
+  const dropIn = join(BUILD, 'icon-source.png');
+  const bitmap = argPath || (existsSync(dropIn) ? dropIn : null);
+
+  if (bitmap) {
+    const img = nativeImage.createFromBuffer(readFileSync(bitmap));
+    if (img.isEmpty()) throw new Error(`could not read ${bitmap} as an image`);
+    const { width, height } = img.getSize();
+    console.log(`source: ${bitmap} (${width}x${height})`);
+    // Square-crop off-centre art rather than distorting it.
+    const side = Math.min(width, height);
+    const square =
+      width === height
+        ? img
+        : img.crop({
+            x: Math.round((width - side) / 2),
+            y: Math.round((height - side) / 2),
+            width: side,
+            height: side,
+          });
+    return square.resize({ width: 1024, height: 1024, quality: 'best' });
+  }
+
+  console.log('source: build/icon.svg');
   const svg = readFileSync(join(BUILD, 'icon.svg'), 'utf8');
   const html = `<!doctype html><meta charset="utf-8">
     <style>html,body{margin:0;padding:0;background:transparent;width:1024px;height:1024px;overflow:hidden}</style>
@@ -50,9 +80,13 @@ app.whenReady().then(async () => {
   await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
   // Give the renderer a beat to paint gradients before capturing.
   await new Promise((r) => setTimeout(r, 400));
-
   const shot = await win.webContents.capturePage();
-  const master = shot.getSize().width === 1024 ? shot : shot.resize({ width: 1024, height: 1024 });
+  win.destroy();
+  return shot.getSize().width === 1024 ? shot : shot.resize({ width: 1024, height: 1024 });
+}
+
+app.whenReady().then(async () => {
+  const master = await buildMaster();
   writeFileSync(join(BUILD, 'icon.png'), master.toPNG());
   console.log(`icon.png: ${master.getSize().width}x${master.getSize().height}`);
 
@@ -68,6 +102,5 @@ app.whenReady().then(async () => {
   rmSync(ICONSET, { recursive: true, force: true });
   console.log('built build/icon.icns');
 
-  win.destroy();
   app.quit();
 });
