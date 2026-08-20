@@ -4,7 +4,7 @@ import { useStore, type BotTab } from '../../state/store';
 import { api, unwrap } from '../../app/api';
 import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 import { ConfirmDialog, Switch, formatRelative } from '../../components/common/ui';
-import type { LogLine, TelegramStatus } from '@shared/contracts';
+import type { LogLine, ModelOptions, TelegramStatus } from '@shared/contracts';
 
 const TABS: { id: BotTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -19,7 +19,7 @@ const TABS: { id: BotTab; label: string }[] = [
 interface ProfileConfig {
   soul: string;
   modelInfo: unknown;
-  modelOptions: unknown;
+  modelOptions: ModelOptions | unknown;
   toolsets: unknown;
   skills: unknown;
   mcp: unknown;
@@ -522,21 +522,13 @@ function ModelPicker({
   const toast = useStore((s) => s.toast);
   const [busy, setBusy] = useState(false);
 
-  const options: { provider: string; model: string }[] = [];
-  const raw = config?.modelOptions;
-  if (raw && typeof raw === 'object') {
-    const arr = Array.isArray(raw) ? raw : (raw as { options?: unknown[] }).options;
-    if (Array.isArray(arr)) {
-      for (const o of arr.slice(0, 50)) {
-        if (o && typeof o === 'object') {
-          const oo = o as Record<string, unknown>;
-          if (typeof oo.model === 'string') {
-            options.push({ provider: String(oo.provider ?? currentProvider ?? ''), model: oo.model });
-          }
-        }
-      }
-    }
-  }
+  // Hermes answers with providers, each carrying its own model list; a
+  // provider without credentials cannot run, so it is shown but unselectable.
+  const opts = config?.modelOptions as ModelOptions | undefined;
+  const groups = (opts?.providers ?? []).filter((p) => p.models.length > 0);
+  const options = groups.flatMap((p) =>
+    p.models.map((m) => ({ provider: p.slug, model: m, authenticated: p.authenticated })),
+  );
 
   const current = `${currentProvider ?? ''}/${currentModel ?? ''}`;
 
@@ -560,11 +552,17 @@ function ModelPicker({
             .finally(() => setBusy(false));
         }}
       >
-        {!options.some((o) => `${o.provider}/${o.model}` === current) ? <option value={current}>{current}</option> : null}
-        {options.map((o) => (
-          <option key={`${o.provider}/${o.model}`} value={`${o.provider}/${o.model}`}>
-            {o.provider} / {o.model}
-          </option>
+        {!options.some((o) => `${o.provider}/${o.model}` === current) ? (
+          <option value={current}>{current}</option>
+        ) : null}
+        {groups.map((g) => (
+          <optgroup key={g.slug} label={g.authenticated ? g.name : `${g.name} — no credentials`}>
+            {g.models.map((m) => (
+              <option key={`${g.slug}/${m}`} value={`${g.slug}/${m}`} disabled={!g.authenticated}>
+                {m}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
     </div>
