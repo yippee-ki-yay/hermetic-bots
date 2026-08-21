@@ -9,12 +9,56 @@ import { useState, type ReactNode } from 'react';
 import { api } from '../../app/api';
 import { Modal } from '../common/ui';
 
+type Align = 'left' | 'center' | 'right';
+
 interface Block {
-  type: 'p' | 'code' | 'h' | 'ul' | 'ol' | 'quote';
+  type: 'p' | 'code' | 'h' | 'ul' | 'ol' | 'quote' | 'table';
   text?: string;
   lang?: string;
   level?: number;
   items?: string[];
+  header?: string[];
+  rows?: string[][];
+  align?: Align[];
+}
+
+/** Split a GFM row on unescaped pipes, dropping the optional outer pipes. */
+function splitRow(line: string): string[] {
+  const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  const cells: string[] = [];
+  let cur = '';
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+    if (ch === '\\' && trimmed[i + 1] === '|') {
+      cur += '|';
+      i++;
+      continue;
+    }
+    if (ch === '|') {
+      cells.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  cells.push(cur.trim());
+  return cells;
+}
+
+/** `|---|:--:|` — the row that turns the line above it into a header. */
+function isDelimiterRow(line: string): boolean {
+  if (!line || !line.includes('-')) return false;
+  const cells = splitRow(line);
+  return cells.length > 0 && cells.every((c) => /^:?-{1,}:?$/.test(c.replace(/\s+/g, '')));
+}
+
+function alignmentsFrom(line: string): Align[] {
+  return splitRow(line).map((c) => {
+    const spec = c.replace(/\s+/g, '');
+    if (spec.startsWith(':') && spec.endsWith(':')) return 'center';
+    if (spec.endsWith(':')) return 'right';
+    return 'left';
+  });
 }
 
 function parseBlocks(src: string): Block[] {
@@ -59,6 +103,24 @@ function parseBlocks(src: string): Block[] {
       blocks.push({ type: 'ol', items });
       continue;
     }
+    // A table is a header row followed by a delimiter row. Checked before the
+    // paragraph fallback, which would otherwise swallow it as pipe-laden text.
+    if (line.includes('|') && isDelimiterRow(lines[i + 1] ?? '')) {
+      const header = splitRow(line);
+      const align = alignmentsFrom(lines[i + 1] ?? '');
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && (lines[i] ?? '').trim() !== '' && (lines[i] ?? '').includes('|')) {
+        const cells = splitRow(lines[i] ?? '');
+        // Pad or trim so every row matches the header width.
+        while (cells.length < header.length) cells.push('');
+        rows.push(cells.slice(0, header.length));
+        i++;
+      }
+      blocks.push({ type: 'table', header, rows, align });
+      continue;
+    }
+
     if (/^\s*>/.test(line)) {
       const buf: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i] ?? '')) {
@@ -86,6 +148,7 @@ function parseBlocks(src: string): Block[] {
 function isBlockStart(line: string): boolean {
   return (
     line.startsWith('```') ||
+    line.includes('|') ||
     /^(#{1,3})\s+/.test(line) ||
     /^\s*[-*]\s+/.test(line) ||
     /^\s*\d+\.\s+/.test(line) ||
@@ -188,6 +251,33 @@ export function Markdown({ source }: { source: string }): React.JSX.Element {
                   <li key={j}>{renderInline(item, onLink)}</li>
                 ))}
               </ol>
+            );
+          case 'table':
+            return (
+              <div className="table-wrap" key={i}>
+                <table>
+                  <thead>
+                    <tr>
+                      {(b.header ?? []).map((cell, j) => (
+                        <th key={j} style={{ textAlign: b.align?.[j] ?? 'left' }}>
+                          {renderInline(cell, onLink)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(b.rows ?? []).map((row, r) => (
+                      <tr key={r}>
+                        {row.map((cell, j) => (
+                          <td key={j} style={{ textAlign: b.align?.[j] ?? 'left' }}>
+                            {renderInline(cell, onLink)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             );
           case 'quote':
             return <blockquote key={i}>{renderInline(b.text ?? '', onLink)}</blockquote>;

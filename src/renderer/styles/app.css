@@ -735,6 +735,51 @@ button:focus-visible,
   margin-top: 3px;
 }
 
+/* Tables use the UI face: serif at table density is hard to scan, and wide
+   tables scroll inside their own container so the page never does. */
+.table-wrap {
+  overflow-x: auto;
+  margin: 12px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.turn-body table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.turn-body th,
+.turn-body td {
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.turn-body th:last-child,
+.turn-body td:last-child {
+  border-right: none;
+}
+
+.turn-body tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.turn-body th {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.turn-body td {
+  color: var(--text-secondary);
+}
+
 .turn-body blockquote {
   border-left: 2px solid var(--border-strong);
   padding-left: 12px;

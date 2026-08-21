@@ -192,6 +192,31 @@ export function createDemoBridge(): HermesApi {
 
   const transcripts = new Map<string, TranscriptEvent[]>([
     [
+      'r-2',
+      [
+        {
+          id: 'r2u1',
+          sessionId: 'r-2',
+          profileName: 'researcher',
+          at: iso(5_500_000),
+          kind: 'user',
+          text: 'Summarize the roster behaviour from the spec as a table.',
+          requestId: 'req-9',
+          delivery: 'complete',
+        },
+        {
+          id: 'r2a1',
+          sessionId: 'r-2',
+          profileName: 'researcher',
+          at: iso(5_400_000),
+          kind: 'assistant',
+          streaming: false,
+          model: 'grok-4.5',
+          text: 'Roster behaviour, as specified:\n\n| Piece | Behavior |\n|---|---|\n| **Row** | Avatar, last-message preview, timestamp |\n| **Click** | Opens that bot\'s canonical Bot Chat (created + pinned at birth) |\n| **Active now** | Presence strip: bots working now (gateway busy + wrote in last 90s) |\n| **Search** | Filter roster |\n| **Forever-chat** | `/new` and `/reset` become `/compact` — same relationship, fresh context |\n\nThe distinction that matters is *display-only* hiding: a hidden bot is still @mentionable and its routines keep running.',
+        },
+      ],
+    ],
+    [
       'r-1',
       [
         {
