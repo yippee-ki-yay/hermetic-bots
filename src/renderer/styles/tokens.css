@@ -21,6 +21,9 @@
 
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  /* Reading face for message prose. macOS ships New York as its system serif,
+     so this needs no downloaded font — the CSP blocks remote font hosts. */
+  --font-prose: ui-serif, 'New York', Charter, Georgia, serif;
 
   --rail-w: 244px;
   --deck-w: 300px;
