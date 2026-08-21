@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slugify, uniqueSlug } from '../../src/renderer/features/profiles/NewBotWizard';
+import { slugify, uniqueSlug } from '../../src/shared/profile-name';
 import { profileNameSchema } from '../../src/shared/schemas';
 
 describe('slugify', () => {

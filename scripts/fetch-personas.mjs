@@ -16,6 +16,7 @@ import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSyn
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { reshapeToSoul } from './reshape-soul.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = {
@@ -25,8 +26,8 @@ const SOURCE = {
   tarball: 'https://codeload.github.com/msitarzewski/agency-agents/tar.gz/refs/heads/main',
 };
 
-/** Bodies are trimmed so the bundle stays sane; SOULs are editable anyway. */
-const MAX_SOUL_CHARS = 9000;
+// Bodies are reshaped into Hermes' SOUL.md shape by reshape-soul.mjs, which
+// applies its own length budget — the source text is only an input here.
 
 function parseFrontmatter(raw) {
   if (!raw.startsWith('---')) return { meta: {}, body: raw };
@@ -73,19 +74,12 @@ try {
       const { meta, body } = parseFrontmatter(raw);
       const id = file.replace(/\.md$/, '');
       const name = meta.name || titleCase(id.replace(new RegExp(`^${division}-`), ''));
-      let soul = body.trim();
-      if (soul.length > MAX_SOUL_CHARS) {
-        soul = `${soul.slice(0, MAX_SOUL_CHARS).replace(/\s+\S*$/, '')}\n\n_(Trimmed for the bundled library — edit freely.)_`;
-      }
-      if (!soul) continue;
-      personas.push({
-        id,
-        name,
-        division,
-        description: meta.description || meta.vibe || '',
-        vibe: meta.vibe || '',
-        soul,
-      });
+      const source = body.trim();
+      if (!source) continue;
+      const description = meta.description || meta.vibe || '';
+      const vibe = meta.vibe || '';
+      const soul = reshapeToSoul({ name, description, vibe, soul: source });
+      personas.push({ id, name, division, description, vibe, soul });
     }
   }
 

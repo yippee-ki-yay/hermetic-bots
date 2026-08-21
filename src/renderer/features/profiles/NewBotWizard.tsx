@@ -14,26 +14,7 @@ import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 import { PersonaPicker } from './PersonaPicker';
 import type { CreateBotStepResult, ModelOptions } from '@shared/contracts';
 import type { PublicError } from '@shared/errors';
-
-/** Hermes profile names must be filesystem-safe; derive one from the label. */
-export function slugify(displayName: string): string {
-  return displayName
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^[^a-z0-9]+/, '')
-    .replace(/-+$/g, '')
-    .slice(0, 64);
-}
-
-export function uniqueSlug(base: string, taken: string[]): string {
-  if (!base) return '';
-  if (!taken.includes(base)) return base;
-  for (let i = 2; i < 100; i++) {
-    const candidate = `${base}-${i}`.slice(0, 64);
-    if (!taken.includes(candidate)) return candidate;
-  }
-  return `${base}-${Date.now().toString(36)}`.slice(0, 64);
-}
+import { slugify, uniqueSlug } from '@shared/profile-name';
 
 export function NewBotWizard(_props: { step: number }): React.JSX.Element {
   const navigate = useStore((s) => s.navigate);

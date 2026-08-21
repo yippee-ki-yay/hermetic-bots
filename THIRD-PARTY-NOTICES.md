@@ -7,9 +7,19 @@
 **agency-agents** — https://github.com/msitarzewski/agency-agents
 Licensed under the MIT License. Copyright (c) 2025 AgentLand Contributors.
 
-Each entry's SOUL text is derived from that project's agent markdown files
-(frontmatter stripped, long bodies trimmed). The MIT license permits this use
-and redistribution; the copyright notice above is retained as it requires.
+Each entry's SOUL text is *derived* from that project's agent markdown files
+rather than copied: `scripts/reshape-soul.mjs` extracts the identity-bearing
+parts (opening statement, role, traits, communication style, prohibitions,
+standards) and rewrites them into the section shape Hermes documents for
+SOUL.md — Personality, Style, Boundaries, Specialties. Workflow, deliverables,
+and success-metric sections are dropped, because Hermes' own guidance places
+those in AGENTS.md and truncates an oversized SOUL. The MIT license permits
+this use and redistribution; the copyright notice above is retained as it
+requires.
+
+Format references:
+- Hermes SOUL.md guidance — https://hermes-agent.nousresearch.com/docs/user-guide/features/personality
+- Soul Spec (Apache-2.0) — https://github.com/clawsouls/soulspec
 
 Re-generate the library with:
 
