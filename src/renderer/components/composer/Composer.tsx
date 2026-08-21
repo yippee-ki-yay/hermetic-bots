@@ -5,8 +5,17 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useStore, draftKey } from '../../state/store';
+import type { AttachmentSummary } from '@shared/contracts';
 import { api, unwrap } from '../../app/api';
 import { Icon } from '../common/Icon';
+
+const NO_ATTACHMENTS: AttachmentSummary[] = [];
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export function Composer({
   profile,
@@ -21,11 +30,15 @@ export function Composer({
   const prefs = useStore((s) => s.prefs);
   const bots = useStore((s) => s.bots);
   const runState = useStore((s) => (sessionId ? (s.runStates[sessionId] ?? 'ready') : 'ready'));
+  // Must return a stable reference: a fresh [] each call makes zustand see a
+  // new value every render and loops forever (React #185).
+  const attachments = useStore((s) => (sessionId ? s.attachments[sessionId] : undefined)) ?? NO_ATTACHMENTS;
   const connection = useStore((s) => s.connection);
   const navigate = useStore((s) => s.navigate);
   const reportError = useStore((s) => s.reportError);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const loadedDraftKey = useRef<string | null>(null);
 
   const bot = bots.find((b) => b.profileName === profile);
@@ -98,6 +111,26 @@ export function Composer({
   return (
     <div className="composer-wrap">
       <div className="composer">
+        {attachments.length > 0 ? (
+          <div className="attach-row">
+            {attachments.map((a) => (
+              <span key={a.id} className="attach-chip">
+                <Icon name={a.kind === 'image' ? 'file' : 'paperclip'} size={12} />
+                <span className="attach-name">{a.name}</span>
+                <span className="attach-size">{formatBytes(a.sizeBytes)}</span>
+                <button
+                  className="attach-remove"
+                  aria-label={`Remove ${a.name}`}
+                  onClick={() => {
+                    if (sessionId) void unwrap(api().attachments.remove(sessionId, a.id)).catch(() => undefined);
+                  }}
+                >
+                  <Icon name="x" size={11} />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
         <textarea
           ref={textareaRef}
           rows={1}
@@ -110,7 +143,26 @@ export function Composer({
           onKeyDown={onKeyDown}
         />
         <div className="composer-footer">
-          <button className="icon-btn" aria-label="Attach context (coming soon)" disabled>
+          <button
+            className="icon-btn"
+            aria-label="Attach files"
+            title="Attach files"
+            disabled={attaching || !online}
+            onClick={async () => {
+              setAttaching(true);
+              try {
+                const result = await unwrap(api().attachments.add(profile, sessionId));
+                // Attaching to an unsaved thread opens the session, so follow it.
+                if (!sessionId && result.sessionId) {
+                  navigate({ view: 'chat', profile, sessionId: result.sessionId });
+                }
+              } catch (err) {
+                reportError(err, 'Could not attach that file');
+              } finally {
+                setAttaching(false);
+              }
+            }}
+          >
             <Icon name="paperclip" size={16} />
           </button>
           <button className="icon-btn" aria-label="Slash commands (coming soon)" disabled>

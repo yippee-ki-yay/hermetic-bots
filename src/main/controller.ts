@@ -21,6 +21,7 @@ import {
 } from './hermes/event-normalizer';
 import { SettingsStore, type StoredConnection } from './storage/settings-store';
 import { pickAvatar, saveAvatar, clearAvatar, loadAvatar, clearAvatarCache } from './avatars';
+import { pickAttachments, toDataUrl } from './attachments';
 import { registerSecret, redact } from './logging/redaction';
 import { log, recordDiagnostic, buildDiagnosticsReport, getLogLines } from './logging/logger';
 import { AppError, publicError, toPublicError, type PublicError } from '@shared/errors';
@@ -44,6 +45,7 @@ import type {
   OrbDefinition,
   LogLine,
   ModelOptions,
+  AttachmentSummary,
 } from '@shared/contracts';
 import type { ConnectConfigInput } from '@shared/schemas';
 
@@ -96,6 +98,12 @@ export class AppController {
   /** Approvals / prompts already answered — exactly-once guard (spec §6.6). */
   private answeredRequests = new Set<string>();
   private streamBuffers = new Map<string, { eventId: string; text: string }>();
+  /**
+   * Files staged for a session's next prompt. Images are queued server-side by
+   * Hermes, but a staged file comes back as an `@file:` reference the client is
+   * expected to put in the message, so both are tracked until the prompt goes.
+   */
+  private pendingAttachments = new Map<string, (AttachmentSummary & { refText?: string; path?: string })[]>();
 
   constructor() {
     this.tunnel.on('state', () => this.pushConnection());
@@ -753,43 +761,20 @@ export class AppController {
     text: string;
     mode: 'normal' | 'steer' | 'background';
   }): Promise<{ sessionId: string }> {
-    let sessionId = input.sessionId;
+    const sessionId =
+      input.sessionId ?? (await this.createSession(input.profileName, input.text, input.requestId));
 
-    if (!sessionId) {
-      const created = await this.ws.call<Record<string, unknown>>('session.create', {
-        profile: input.profileName,
-      });
-      const gatewayId = String(created?.session_id ?? created?.id ?? '');
-      // Prefer the durable id so the thread keeps working after a restart;
-      // fall back to the gateway handle on builds that omit it.
-      sessionId = String(created?.stored_session_id ?? '') || gatewayId;
-      if (!sessionId) {
-        throw new AppError(
-          publicError('hermes/schema-mismatch', 'Session not created', 'Hermes did not return a session id.', true),
-        );
-      }
-      this.bindSessionIds(sessionId, gatewayId || sessionId);
-      this.sessionProfile.set(sessionId, input.profileName);
-      this.activeSessionId = sessionId;
-      const thread: ThreadSummary = {
-        id: sessionId,
-        profileName: input.profileName,
-        title: input.text.slice(0, 60),
-        preview: input.text.slice(0, 120),
-        updatedAt: new Date().toISOString(),
-        state: 'active',
-        unread: false,
-      };
-      const list = this.threads.get(input.profileName) ?? [];
-      this.threads.set(input.profileName, [thread, ...list]);
-      this.push({ type: 'session.created', provisionalId: input.requestId, thread });
-    }
+    // A staged file comes back as an `@file:` ref that Hermes expects in the
+    // message itself; images are already queued server-side and need nothing.
+    const staged = this.pendingAttachments.get(sessionId) ?? [];
+    const refs = staged.map((a) => a.refText).filter((r): r is string => Boolean(r));
+    const text = refs.length > 0 ? `${input.text}\n\n${refs.join('\n')}` : input.text;
 
     const pending: PendingPrompt = {
       requestId: input.requestId,
       profileName: input.profileName,
       sessionId,
-      text: input.text,
+      text,
       state: 'submitting',
       at: Date.now(),
     };
@@ -801,7 +786,7 @@ export class AppController {
       profileName: input.profileName,
       at: new Date().toISOString(),
       kind: 'user',
-      text: input.text,
+      text,
       requestId: input.requestId,
       delivery: 'submitting',
       steered: input.mode === 'steer',
@@ -816,8 +801,13 @@ export class AppController {
         session_id: this.wsId(sessionId),
         profile: input.profileName,
         request_id: input.requestId,
-        text: input.text,
+        text,
       });
+      // The staging is consumed by this turn.
+      if (staged.length > 0) {
+        this.pendingAttachments.delete(sessionId);
+        this.pushAttachments(sessionId);
+      }
       pending.state = 'acknowledged';
       this.push({ type: 'prompt.delivery', sessionId, requestId: input.requestId, delivery: 'acknowledged' });
       this.push({ type: 'run.state', sessionId, runState: 'thinking' });
@@ -834,6 +824,142 @@ export class AppController {
       throw err;
     }
     return { sessionId };
+  }
+
+  /**
+   * Create a Hermes session and register it as a thread. Extracted from the
+   * prompt path so attaching a file to an unsaved thread can open one too.
+   */
+  private async createSession(
+    profileName: string,
+    seedText = '',
+    provisionalId: string = randomUUID(),
+  ): Promise<string> {
+    const created = await this.ws.call<Record<string, unknown>>('session.create', {
+      profile: profileName,
+    });
+    const gatewayId = String(created?.session_id ?? created?.id ?? '');
+    // Prefer the durable id so the thread keeps working after a restart;
+    // fall back to the gateway handle on builds that omit it.
+    const sessionId = String(created?.stored_session_id ?? '') || gatewayId;
+    if (!sessionId) {
+      throw new AppError(
+        publicError('hermes/schema-mismatch', 'Session not created', 'Hermes did not return a session id.', true),
+      );
+    }
+    this.bindSessionIds(sessionId, gatewayId || sessionId);
+    this.sessionProfile.set(sessionId, profileName);
+    this.activeSessionId = sessionId;
+    const thread: ThreadSummary = {
+      id: sessionId,
+      profileName,
+      title: seedText.slice(0, 60) || 'New thread',
+      preview: seedText.slice(0, 120),
+      updatedAt: new Date().toISOString(),
+      state: 'active',
+      unread: false,
+    };
+    const list = this.threads.get(profileName) ?? [];
+    this.threads.set(profileName, [thread, ...list]);
+    this.push({ type: 'session.created', provisionalId, thread });
+    return sessionId;
+  }
+
+  // --- attachments ---------------------------------------------------------
+
+  /** Open the picker, upload each file, and stage it for the next prompt. */
+  async attachFiles(
+    profileName: string,
+    sessionId: string | null,
+  ): Promise<{ sessionId: string; attachments: AttachmentSummary[] }> {
+    const files = await pickAttachments(this.window);
+    if (files.length === 0) {
+      return { sessionId: sessionId ?? '', attachments: sessionId ? this.attachmentsFor(sessionId) : [] };
+    }
+    // Attaching to an unsaved thread opens the session first; Hermes binds
+    // attachments to a session, so there is nothing to attach them to yet.
+    const sid = sessionId ?? (await this.createSession(profileName));
+    const staged = this.pendingAttachments.get(sid) ?? [];
+
+    for (const file of files) {
+      const id = randomUUID();
+      try {
+        if (file.kind === 'image') {
+          const res = await this.ws.call<Record<string, unknown>>('image.attach_bytes', {
+            session_id: this.wsId(sid),
+            content_base64: file.bytes.toString('base64'),
+            filename: file.name,
+          });
+          staged.push({
+            id,
+            name: file.name,
+            kind: 'image',
+            sizeBytes: file.bytes.byteLength,
+            path: typeof res?.path === 'string' ? res.path : undefined,
+          });
+        } else {
+          // PDFs go through here too: pdf.attach renders pages to images and
+          // needs poppler on the server, which is not guaranteed; file.attach
+          // stages the document so the agent's file tools can read it.
+          const res = await this.ws.call<Record<string, unknown>>('file.attach', {
+            session_id: this.wsId(sid),
+            data_url: toDataUrl(file),
+            name: file.name,
+          });
+          staged.push({
+            id,
+            name: file.name,
+            kind: 'file',
+            sizeBytes: file.bytes.byteLength,
+            refText: typeof res?.ref_text === 'string' ? res.ref_text : undefined,
+            path: typeof res?.path === 'string' ? res.path : undefined,
+          });
+        }
+      } catch (err) {
+        log.warn('attachments', `attach failed for ${file.name}: ${toPublicError(err).message}`);
+        throw err;
+      }
+    }
+
+    this.pendingAttachments.set(sid, staged);
+    this.pushAttachments(sid);
+    return { sessionId: sid, attachments: this.attachmentsFor(sid) };
+  }
+
+  async detachFile(sessionId: string, id: string): Promise<void> {
+    const staged = this.pendingAttachments.get(sessionId) ?? [];
+    const entry = staged.find((a) => a.id === id);
+    if (!entry) return;
+    if (entry.kind === 'image' && entry.path) {
+      try {
+        await this.ws.call('image.detach', { session_id: this.wsId(sessionId), path: entry.path });
+      } catch (err) {
+        // Removing the chip locally is still the right outcome.
+        log.warn('attachments', `detach failed: ${toPublicError(err).message}`);
+      }
+    }
+    this.pendingAttachments.set(
+      sessionId,
+      staged.filter((a) => a.id !== id),
+    );
+    this.pushAttachments(sessionId);
+  }
+
+  private attachmentsFor(sessionId: string): AttachmentSummary[] {
+    return (this.pendingAttachments.get(sessionId) ?? []).map(({ id, name, kind, sizeBytes }) => ({
+      id,
+      name,
+      kind,
+      sizeBytes,
+    }));
+  }
+
+  private pushAttachments(sessionId: string): void {
+    this.push({
+      type: 'attachments.updated',
+      sessionId,
+      attachments: this.attachmentsFor(sessionId),
+    });
   }
 
   async interrupt(sessionId: string): Promise<void> {

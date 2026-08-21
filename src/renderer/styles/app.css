@@ -602,6 +602,15 @@ button:focus-visible,
   color: var(--accent-cyan);
 }
 
+.crumb-rename {
+  font: inherit;
+  background: var(--surface-elevated);
+  border: 1px solid var(--accent-cyan);
+  border-radius: 6px;
+  padding: 1px 6px;
+  min-width: 220px;
+}
+
 .crumb-path .sep {
   color: var(--text-muted);
   font-weight: 400;
@@ -1156,6 +1165,54 @@ button:focus-visible,
  * caret already shows where typing goes, so focus now reads as a quiet lift
  * of the existing border instead.
  */
+/* Staged attachments sit above the input, inside the dock. */
+.attach-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 6px 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  background: var(--surface-elevated);
+}
+
+.attach-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attach-size {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.attach-remove {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.attach-remove:hover {
+  color: var(--danger);
+  background: var(--surface-hover);
+}
+
 .composer:focus-within {
   border-color: #46595f;
 }

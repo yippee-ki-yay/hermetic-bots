@@ -1,6 +1,8 @@
 /** Command Header (spec §7.1): breadcrumb, run state, connection capsule. */
 import { useStore } from '../../state/store';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../common/Icon';
+import { api, unwrap } from '../../app/api';
 import type { RunState } from '@shared/contracts';
 
 const RUN_LABEL: Record<RunState, string> = {
@@ -26,6 +28,34 @@ export function CommandHeader({
 
   const showThreadDeck = useStore((s) => s.prefs.showThreadDeck);
   const toggleThreadDeck = useStore((s) => s.toggleThreadDeck);
+  const reportError = useStore((s) => s.reportError);
+  const loadThreads = useStore((s) => s.loadThreads);
+
+  // Renaming a chat from the breadcrumb, since the thread panel that also
+  // offers it is collapsed by default.
+  const [renaming, setRenaming] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setRenaming(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (renaming) inputRef.current?.select();
+  }, [renaming]);
+
+  const commitRename = async (): Promise<void> => {
+    const title = draftTitle.trim();
+    setRenaming(false);
+    if (!sessionId || !title || title === thread?.title) return;
+    try {
+      await unwrap(api().threads.rename(sessionId, title));
+      void loadThreads(profile);
+    } catch (err) {
+      reportError(err, 'Could not rename this chat');
+    }
+  };
 
   const bot = bots.find((b) => b.profileName === profile);
   const thread = threads?.find((t) => t.id === sessionId);
@@ -59,9 +89,33 @@ export function CommandHeader({
             {bot?.displayName ?? profile}
           </button>
           <span className="sep">/</span>
-          <span style={{ color: thread ? undefined : 'var(--text-muted)' }}>
-            {thread?.title ?? 'New thread'}
-          </span>
+          {renaming ? (
+            <input
+              ref={inputRef}
+              className="crumb-rename"
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onBlur={() => void commitRename()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void commitRename();
+                if (e.key === 'Escape') setRenaming(false);
+              }}
+              autoFocus
+            />
+          ) : thread ? (
+            <button
+              className="crumb-bot"
+              title="Rename this chat"
+              onClick={() => {
+                setDraftTitle(thread.title);
+                setRenaming(true);
+              }}
+            >
+              {thread.title}
+            </button>
+          ) : (
+            <span style={{ color: 'var(--text-muted)' }}>New thread</span>
+          )}
         </div>
         <div className={`crumb-state ${runState === 'waiting-approval' || runState === 'disconnected' ? 'attention' : ''}`}>
           {runState === 'thinking' || runState === 'tool-running' ? (

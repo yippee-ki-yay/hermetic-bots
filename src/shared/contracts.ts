@@ -320,6 +320,14 @@ export interface ProfileDetails {
   path?: string;
 }
 
+/** A file staged for the next prompt. Server paths stay in the main process. */
+export interface AttachmentSummary {
+  id: string;
+  name: string;
+  kind: 'image' | 'file';
+  sizeBytes: number;
+}
+
 /** One entry in the bundled persona library (metadata only). */
 export interface PersonaSummary {
   id: string;
@@ -404,7 +412,8 @@ export type PushEvent =
   | { type: 'run.state'; sessionId: string; runState: RunState }
   | { type: 'prompt.delivery'; sessionId: string; requestId: string; delivery: PromptDeliveryState }
   | { type: 'gateway.status'; profileName: string; status: TelegramStatus }
-  | { type: 'session.created'; provisionalId: string; thread: ThreadSummary };
+  | { type: 'session.created'; provisionalId: string; thread: ThreadSummary }
+  | { type: 'attachments.updated'; sessionId: string; attachments: AttachmentSummary[] };
 
 export interface PushEnvelope {
   v: 1;

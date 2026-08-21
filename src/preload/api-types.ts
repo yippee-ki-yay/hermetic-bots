@@ -5,6 +5,7 @@
  */
 import type {
   AppPreferences,
+  AttachmentSummary,
   BotSummary,
   Capabilities,
   ConnectionConfigPublic,
@@ -137,6 +138,13 @@ export interface HermesApi {
     interrupt(sessionId: string): Promise<IpcResult<boolean>>;
     retry(requestId: string): Promise<IpcResult<boolean>>;
     transcript(sessionId: string): Promise<IpcResult<TranscriptEvent[]>>;
+  };
+  attachments: {
+    /** Opens the native picker in main; stages the files for the next prompt. */
+    add(profileName: string, sessionId: string | null): Promise<
+      IpcResult<{ sessionId: string; attachments: AttachmentSummary[] }>
+    >;
+    remove(sessionId: string, id: string): Promise<IpcResult<boolean>>;
   };
   approvals: {
     respondApproval(sessionId: string, requestId: string, approve: boolean): Promise<IpcResult<boolean>>;

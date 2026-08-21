@@ -74,6 +74,10 @@ const api: HermesApi = {
     retry: (requestId) => invoke('chat.retry', { requestId }),
     transcript: (sessionId) => invoke('chat.transcript', { sessionId }),
   },
+  attachments: {
+    add: (profileName, sessionId) => invoke('attachments.add', { profileName, sessionId }),
+    remove: (sessionId, id) => invoke('attachments.remove', { sessionId, id }),
+  },
   approvals: {
     respondApproval: (sessionId, requestId, approve) =>
       invoke('approval.respond', { sessionId, requestId, approve }),

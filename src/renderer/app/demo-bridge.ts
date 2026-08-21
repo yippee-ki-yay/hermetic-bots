@@ -6,6 +6,7 @@
  */
 import type { HermesApi, IpcResult, ConnectionStatePayload } from '../../preload/api-types';
 import type {
+  AttachmentSummary,
   BotSummary,
   ThreadSummary,
   TranscriptEvent,
@@ -38,6 +39,7 @@ export function createDemoBridge(): HermesApi {
   };
 
   let prefs: AppPreferences = { ...DEFAULT_PREFERENCES };
+  const demoAttachments = new Map<string, AttachmentSummary[]>();
 
   const connection: ConnectionSummary = {
     id: 'demo',
@@ -440,9 +442,34 @@ export function createDemoBridge(): HermesApi {
           ),
         ),
       history: (_profileName, sessionId) => ok(transcripts.get(sessionId) ?? []),
-      rename: () => ok(true),
-      archive: () => ok(true),
-      delete: () => ok(true),
+      // Mutate the demo data so renaming, archiving, and deleting are
+      // reviewable without a server, as with setOrb and avatars.
+      // Replace rather than mutate: the real controller rebuilds each
+      // ThreadSummary from the server response, so a mutated-in-place demo
+      // would hide list components that only re-render on a new reference.
+      rename: (sessionId, title) => {
+        for (const [profile, list] of threads.entries()) {
+          threads.set(profile, list.map((x) => (x.id === sessionId ? { ...x, title } : x)));
+        }
+        return ok(true);
+      },
+      archive: (sessionId, archived) => {
+        for (const [profile, list] of threads.entries()) {
+          threads.set(
+            profile,
+            list.map((x) =>
+              x.id === sessionId ? { ...x, state: archived ? ('archived' as const) : ('idle' as const) } : x,
+            ),
+          );
+        }
+        return ok(true);
+      },
+      delete: (sessionId) => {
+        for (const [profile, list] of threads.entries()) {
+          threads.set(profile, list.filter((x) => x.id !== sessionId));
+        }
+        return ok(true);
+      },
       branch: () => ok(null),
     },
     chat: {
@@ -513,6 +540,31 @@ export function createDemoBridge(): HermesApi {
       },
       retry: () => ok(true),
       transcript: (sessionId) => ok(transcripts.get(sessionId) ?? []),
+    },
+    attachments: {
+      // No native dialog outside Electron; stage a stand-in so the composer
+      // chips and removal are reviewable in a browser.
+      add: (_profileName, sessionId) => {
+        const sid = sessionId ?? 'demo-session';
+        const list = [
+          ...(demoAttachments.get(sid) ?? []),
+          {
+            id: `att-${Date.now()}`,
+            name: 'screenshot.png',
+            kind: 'image' as const,
+            sizeBytes: 184_320,
+          },
+        ];
+        demoAttachments.set(sid, list);
+        emit({ type: 'attachments.updated', sessionId: sid, attachments: list });
+        return ok({ sessionId: sid, attachments: list });
+      },
+      remove: (sessionId, id) => {
+        const list = (demoAttachments.get(sessionId) ?? []).filter((a) => a.id !== id);
+        demoAttachments.set(sessionId, list);
+        emit({ type: 'attachments.updated', sessionId, attachments: list });
+        return ok(true);
+      },
     },
     approvals: {
       respondApproval: (sessionId, requestId, approve) => {

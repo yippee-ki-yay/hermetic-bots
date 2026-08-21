@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { api, unwrap, ApiError } from '../app/api';
 import type {
   AppPreferences,
+  AttachmentSummary,
   BotSummary,
   Capabilities,
   ConnectionSummary,
@@ -58,6 +59,7 @@ interface AppState {
   threads: Record<string, ThreadSummary[]>;
   transcripts: Record<string, TranscriptEvent[]>;
   runStates: Record<string, RunState>;
+  attachments: Record<string, AttachmentSummary[]>;
   drafts: Record<string, string>;
   threadFilter: ThreadFilter;
   threadSearch: string;
@@ -132,6 +134,7 @@ export const useStore = create<AppState>((set, get) => ({
   threads: {},
   transcripts: {},
   runStates: {},
+  attachments: {},
   drafts: {},
   threadFilter: 'all',
   threadSearch: '',
@@ -352,6 +355,9 @@ export const useStore = create<AppState>((set, get) => ({
         }
         return;
       }
+      case 'attachments.updated':
+        set({ attachments: { ...get().attachments, [event.sessionId]: event.attachments } });
+        return;
       case 'gateway.status':
         return; // handled via bot.updated
     }

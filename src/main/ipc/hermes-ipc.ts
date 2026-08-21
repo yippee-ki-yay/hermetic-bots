@@ -157,6 +157,21 @@ export function registerHermesIpc(controller: AppController): void {
     return true;
   });
 
+  handle(
+    'attachments.add',
+    z.object({ profileName: profileNameSchema, sessionId: sessionIdSchema.nullable() }),
+    ({ profileName, sessionId }) => controller.attachFiles(profileName, sessionId),
+  );
+
+  handle(
+    'attachments.remove',
+    z.object({ sessionId: sessionIdSchema, id: z.string().max(64) }),
+    async ({ sessionId, id }) => {
+      await controller.detachFile(sessionId, id);
+      return true;
+    },
+  );
+
   handle('chat.transcript', z.object({ sessionId: sessionIdSchema }), ({ sessionId }) =>
     controller.getTranscript(sessionId),
   );
