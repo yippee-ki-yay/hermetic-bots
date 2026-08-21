@@ -144,6 +144,74 @@ export function ToolRow({ event }: { event: ToolEvent }): React.JSX.Element {
   );
 }
 
+/**
+ * Consecutive tool calls collapse into one summary line.
+ *
+ * A long run of tool calls is scaffolding, not conversation — rendering each
+ * as a full-width card buried the actual reply. The group stays open while
+ * anything in it is still running, then closes itself once the run settles,
+ * unless the user has taken control of it.
+ */
+export function ToolGroup({ events }: { events: ToolEvent[] }): React.JSX.Element {
+  const running = events.some((e) => e.status === 'running');
+  const failed = events.filter((e) => e.status === 'failed').length;
+  const [override, setOverride] = useState<boolean | null>(null);
+  const open = override ?? running;
+
+  if (events.length === 1) return <ToolRow event={events[0]!} />;
+
+  // "read_file ×5, terminal, search_files ×2"
+  const counts = new Map<string, number>();
+  for (const e of events) counts.set(e.toolName, (counts.get(e.toolName) ?? 0) + 1);
+  const names = [...counts.entries()]
+    .map(([name, n]) => (n > 1 ? `${name} ×${n}` : name))
+    .slice(0, 3)
+    .join(', ');
+  const more = counts.size > 3 ? `, +${counts.size - 3} more` : '';
+
+  const totalMs = events.reduce((sum, e) => sum + (e.elapsedMs ?? 0), 0);
+  const elapsed = totalMs > 0 ? (totalMs > 1000 ? `${(totalMs / 1000).toFixed(1)}s` : `${totalMs}ms`) : null;
+
+  return (
+    <div className="tool-group">
+      <button
+        className="tool-row tool-row-head tool-group-head"
+        onClick={() => setOverride(!open)}
+        aria-expanded={open}
+        aria-label={`${events.length} tool calls, ${failed > 0 ? `${failed} failed` : running ? 'running' : 'complete'}`}
+      >
+        <Icon name="wrench" size={15} />
+        <span className="tool-name">{events.length} tools</span>
+        <span className="tool-group-names">{names}{more}</span>
+        <span className={`tool-status ${failed > 0 ? 'failed' : running ? 'running' : 'complete'}`}>
+          {running ? (
+            <>
+              <span className="run-lines">
+                <i />
+                <i />
+                <i />
+              </span>
+              running
+            </>
+          ) : failed > 0 ? (
+            `${failed} failed`
+          ) : (
+            (elapsed ?? 'done')
+          )}
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={13} />
+        </span>
+      </button>
+      {open ? (
+        <div className="tool-group-body">
+          {events.map((e) => (
+            <ToolRow key={e.id} event={e} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SystemMarker({ event }: { event: SystemEvent }): React.JSX.Element {
   return (
     <div className="sys-marker" id={`evt-${event.id}`} role="status">

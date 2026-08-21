@@ -5,10 +5,10 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
-import { AssistantTurn, UserTurn, ToolRow, SystemMarker } from './events';
+import { AssistantTurn, UserTurn, ToolGroup, SystemMarker } from './events';
 import { ApprovalPanel, ClarifyPanel, SudoPanel, SecretPanel } from './RequestPanels';
 import { avatarBodyColor } from '../shell/PersonaAvatar';
-import type { TranscriptEvent } from '@shared/contracts';
+import type { ToolEvent, TranscriptEvent } from '@shared/contracts';
 
 const WINDOW_SIZE = 300;
 const NEAR_BOTTOM_PX = 120;
@@ -89,14 +89,35 @@ export function Transcript({
 
   const color = bot ? avatarBodyColor(bot.orb) : 'var(--accent-cyan)';
 
+  // Runs of tool calls render as a single collapsed group rather than one
+  // card each, so scaffolding does not drown the conversation.
+  type RenderItem =
+    | { type: 'event'; key: string; event: TranscriptEvent }
+    | { type: 'tools'; key: string; events: ToolEvent[] };
+
+  const items = useMemo(() => {
+    const out: RenderItem[] = [];
+    for (const e of visible.items) {
+      const last = out[out.length - 1];
+      if (e.kind === 'tool') {
+        if (last?.type === 'tools') {
+          last.events.push(e);
+          continue;
+        }
+        out.push({ type: 'tools', key: e.id, events: [e] });
+        continue;
+      }
+      out.push({ type: 'event', key: e.id, event: e });
+    }
+    return out;
+  }, [visible.items]);
+
   const renderEvent = (e: TranscriptEvent): React.JSX.Element | null => {
     switch (e.kind) {
       case 'assistant':
         return <AssistantTurn key={e.id} event={e} botName={bot?.displayName ?? profile} botColor={color} />;
       case 'user':
         return <UserTurn key={e.id} event={e} />;
-      case 'tool':
-        return <ToolRow key={e.id} event={e} />;
       case 'approval':
         return <ApprovalPanel key={e.id} event={e} currentProfile={profile} />;
       case 'clarify':
@@ -123,7 +144,13 @@ export function Transcript({
         {events === undefined ? (
           <div className="sys-marker">Loading history…</div>
         ) : (
-          visible.items.map(renderEvent)
+          items.map((item) =>
+            item.type === 'tools' ? (
+              <ToolGroup key={item.key} events={item.events} />
+            ) : (
+              renderEvent(item.event)
+            ),
+          )
         )}
       </div>
       {hasNew ? (
