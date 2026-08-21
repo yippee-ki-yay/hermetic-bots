@@ -98,7 +98,7 @@ export function App(): React.JSX.Element {
         workspace = <BotDetails profile={route.profile} tab={route.tab} />;
         break;
       case 'wizard':
-        shellClass = 'app-shell wizard-deck';
+        shellClass = 'app-shell no-deck';
         workspace = <NewBotWizard step={route.step} />;
         break;
       case 'connection':

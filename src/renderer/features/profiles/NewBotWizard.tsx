@@ -1,633 +1,258 @@
-/** Five-step New Bot wizard (spec §7.3): Identity, Persona, Capabilities,
- * Telegram, Review — with recoverable partial failure. */
+/**
+ * New bot: one screen, two decisions — a name and a role.
+ *
+ * Everything else is inferred: the avatar is derived from the profile name,
+ * the provider/model come from whatever the server is authenticated for, and
+ * Telegram is deliberately left for the bot's settings once it exists. The
+ * five-step wizard the spec described (§7.3) collapsed to this because every
+ * other field has a sane default and stays editable afterwards.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap } from '../../app/api';
 import { PersonaAvatar } from '../../components/shell/PersonaAvatar';
 import { PersonaPicker } from './PersonaPicker';
-import type { OrbDefinition, CreateBotStepResult } from '@shared/contracts';
-import { AVATAR_PALETTES, JAR_SHAPES, EYE_STYLES, POSES, resolveAvatar } from '@shared/avatar';
-import type { ModelOptions } from '@shared/contracts';
+import type { CreateBotStepResult, ModelOptions } from '@shared/contracts';
 import type { PublicError } from '@shared/errors';
 
-const STEPS = ['Identity', 'Persona', 'Capabilities', 'Telegram', 'Review'] as const;
-
-const SOUL_PRESETS: Record<string, string> = {
-  'Chief of Staff': `# Role\nYou are a Chief of Staff persona: organized, direct, and protective of the operator's time.\n\n# Mission\nTurn scattered inputs into clear priorities, drafts, and follow-ups.\n\n# Working style\nShort, structured answers. Surface decisions, not summaries of process.\n\n# Boundaries\nNever send external messages without an explicit instruction.\n\n# Escalation rules\nFlag anything ambiguous or risky instead of guessing.\n\n# Output style\nBullet lists for status; prose for judgment calls.`,
-  Researcher: `# Role\nYou are a Researcher persona: rigorous, skeptical, and thorough.\n\n# Mission\nProduce careful, sourced analysis and readable memos.\n\n# Working style\nState confidence levels. Separate evidence from interpretation.\n\n# Boundaries\nNever fabricate citations or data.\n\n# Escalation rules\nAsk before spending more than ~15 minutes on a dead end.\n\n# Output style\nMemos with headings; inline source notes.`,
-  Operations: `# Role\nYou are an Operations persona: cautious, methodical, audit-friendly.\n\n# Mission\nKeep the server and scheduled routines healthy.\n\n# Working style\nPlan, show the plan, then act. Prefer dry runs.\n\n# Boundaries\nDestructive commands always go through approval.\n\n# Escalation rules\nStop and report on any unexpected system state.\n\n# Output style\nChecklists and exact command output snippets.`,
-  Analyst: `# Role\nYou are an Analyst persona: numerate, precise, and conservative.\n\n# Mission\nRead reports, explain changes, and quantify uncertainty.\n\n# Working style\nShow the calculation. Distinguish observed from inferred.\n\n# Boundaries\nRead-only: never execute trades, sign, or submit transactions.\n\n# Escalation rules\nFlag data-quality problems before drawing conclusions.\n\n# Output style\nCompact tables and short verdicts.`,
-};
-
-interface WizardData {
-  name: string;
-  displayName: string;
-  role: string;
-  description: string;
-  orb: OrbDefinition;
-  /** Chosen picture, applied after the profile exists. */
-  avatarDataUri?: string;
-  startingPoint: 'blank' | 'clone';
-  cloneFrom: string | null;
-  soul: string;
-  provider: string;
-  model: string;
-  workingDirNote: string;
-  approvalMode: 'require-approval' | 'permissive';
-  telegramToken: string;
-  telegramMentionOnly: boolean;
-  telegramAllowed: string;
-  telegramSkipped: boolean;
+/** Hermes profile names must be filesystem-safe; derive one from the label. */
+export function slugify(displayName: string): string {
+  return displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
+    .replace(/-+$/g, '')
+    .slice(0, 64);
 }
 
-const NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
+export function uniqueSlug(base: string, taken: string[]): string {
+  if (!base) return '';
+  if (!taken.includes(base)) return base;
+  for (let i = 2; i < 100; i++) {
+    const candidate = `${base}-${i}`.slice(0, 64);
+    if (!taken.includes(candidate)) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`.slice(0, 64);
+}
 
-export function NewBotWizard({ step }: { step: number }): React.JSX.Element {
+export function NewBotWizard(_props: { step: number }): React.JSX.Element {
   const navigate = useStore((s) => s.navigate);
   const bots = useStore((s) => s.bots);
   const toast = useStore((s) => s.toast);
-  const reportError = useStore((s) => s.reportError);
-  const [data, setData] = useState<WizardData>(() => ({
-    name: '',
-    displayName: '',
-    role: '',
-    description: '',
-    orb: { paletteId: AVATAR_PALETTES[0]!.id, seed: String(Date.now()) },
-    startingPoint: 'blank',
-    cloneFrom: null,
-    soul: '',
-    provider: '',
-    model: '',
-    workingDirNote: '',
-    approvalMode: 'require-approval',
-    telegramToken: '',
-    telegramMentionOnly: true,
-    telegramAllowed: '',
-    telegramSkipped: false,
-  }));
+
+  const [displayName, setDisplayName] = useState('');
+  const [role, setRole] = useState('');
+  const [soul, setSoul] = useState('');
+  const [personaName, setPersonaName] = useState('');
+  const [description, setDescription] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [models, setModels] = useState<ModelOptions | null>(null);
-
-  // Providers must come from the server: a hardcoded slug produced profiles
-  // whose agent init failed with "No usable credentials found".
-  useEffect(() => {
-    void unwrap(api().models.options())
-      .then((opts) => {
-        setModels(opts);
-        const current =
-          opts.providers.find((p) => p.slug === opts.currentProvider) ??
-          opts.providers.find((p) => p.isCurrent && p.authenticated) ??
-          opts.providers.find((p) => p.authenticated);
-        if (!current) return;
-        setData((prev) =>
-          prev.provider
-            ? prev
-            : {
-                ...prev,
-                provider: current.slug,
-                model:
-                  current.models.find((m) => m === opts.currentModel) ?? current.models[0] ?? '',
-              },
-        );
-      })
-      .catch(() => undefined);
-  }, []);
   const [creating, setCreating] = useState(false);
-  const [createResult, setCreateResult] = useState<{
-    profileName?: string;
-    steps: CreateBotStepResult[];
-    telegram?: { ok: boolean; error?: PublicError };
-  } | null>(null);
+  const [failed, setFailed] = useState<CreateBotStepResult[] | null>(null);
 
-  const set = (patch: Partial<WizardData>): void => setData((d) => ({ ...d, ...patch }));
+  // The provider must be one the server holds credentials for; a hardcoded
+  // slug previously produced bots that failed on their first prompt.
+  useEffect(() => {
+    void unwrap(api().models.options()).then(setModels).catch(() => undefined);
+  }, []);
 
-  // Seed off the profile name so the preview matches what gets created.
-  const previewOrb = { ...data.orb, seed: data.name || data.orb.seed };
-  const resolved = resolveAvatar(previewOrb);
-  const go = (s: number): void => navigate({ view: 'wizard', step: s });
+  const provider = useMemo(() => {
+    if (!models) return undefined;
+    return (
+      models.providers.find((p) => p.slug === models.currentProvider) ??
+      models.providers.find((p) => p.isCurrent && p.authenticated) ??
+      models.providers.find((p) => p.authenticated)
+    );
+  }, [models]);
 
-  const nameError = useMemo(() => {
-    if (!data.name) return null;
-    if (!NAME_RE.test(data.name)) return 'Use lowercase letters, digits, dot, dash, or underscore; start alphanumeric.';
-    if (data.name.length > 64) return 'Keep it under 64 characters.';
-    if (bots.some((b) => b.profileName === data.name)) return 'A profile with this name already exists.';
-    return null;
-  }, [data.name, bots]);
+  const model = provider
+    ? (provider.models.find((m) => m === models?.currentModel) ?? provider.models[0])
+    : undefined;
 
-  const stepValid: boolean[] = [
-    Boolean(data.name && !nameError && data.displayName.trim()),
-    true,
-    true,
-    true,
-    true,
-  ];
+  const profileName = useMemo(
+    () => uniqueSlug(slugify(displayName), bots.map((b) => b.profileName)),
+    [displayName, bots],
+  );
 
-  const riskFlags: string[] = [];
-  if (data.approvalMode === 'permissive') {
-    riskFlags.push('Permissive approvals combined with terminal or mutating tools lets this bot act on the server without asking. Recommended only for read-only personas.');
-  }
+  const nameError =
+    displayName.trim() && !profileName
+      ? 'Use at least one letter or digit so the profile has a usable name.'
+      : null;
+
+  const canCreate = Boolean(profileName) && !nameError && !creating;
 
   const create = async (): Promise<void> => {
     setCreating(true);
-    setCreateResult(null);
+    setFailed(null);
     try {
       const result = await unwrap(
         api().bots.create({
-          name: data.name,
-          displayName: data.displayName.trim() || data.name,
-          role: data.role.trim() || undefined,
-          description: data.description.trim() || undefined,
-          orb: { ...data.orb, seed: data.name },
-          soul: data.soul.trim() || undefined,
-          provider: data.provider || undefined,
-          model: data.model || undefined,
-          cloneFrom: data.startingPoint === 'clone' ? data.cloneFrom : null,
+          name: profileName,
+          displayName: displayName.trim(),
+          role: role.trim() || undefined,
+          description: description.trim() || undefined,
+          // An empty palette means "derive one from the seed", so the avatar
+          // is chosen automatically and stays stable for this profile.
+          orb: { paletteId: '', seed: profileName },
+          soul: soul.trim() || undefined,
+          provider: provider?.slug,
+          model,
         }),
       );
-      let telegram: { ok: boolean; error?: PublicError } | undefined;
-      const profileCreated = result.steps.find((s) => s.step === 'profile')?.ok;
-      // Local presentation data: apply once the profile exists, and never let
-      // it fail the wizard.
-      if (profileCreated && data.avatarDataUri) {
-        try {
-          await unwrap(api().avatar.set(data.name, data.avatarDataUri));
-        } catch {
-          toast('Bot created, but the picture could not be saved');
-        }
+      const profileStep = result.steps.find((s) => s.step === 'profile');
+      if (!profileStep?.ok) {
+        setFailed(result.steps);
+        return;
       }
-      if (profileCreated && !data.telegramSkipped && data.telegramToken.trim()) {
-        try {
-          await unwrap(
-            api().telegram.configure({
-              profileName: data.name,
-              token: data.telegramToken.trim(),
-              mentionOnly: data.telegramMentionOnly,
-              allowedUsers: data.telegramAllowed
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean),
-              enabled: true,
-            }),
-          );
-          telegram = { ok: true };
-        } catch (err) {
-          telegram = { ok: false, error: (err as { publicError?: PublicError }).publicError };
-        }
-        // Clear the token from renderer memory immediately (spec §6.5).
-        set({ telegramToken: '' });
+      const partial = result.steps.filter((s) => !s.ok);
+      if (partial.length > 0) {
+        // The profile exists; report what did not land rather than rolling back.
+        setFailed(result.steps);
+        toast('Bot created with warnings', partial.map((s) => s.step).join(', '));
+      } else {
+        toast('Bot created', displayName.trim());
       }
-      setCreateResult({ profileName: result.profileName, steps: result.steps, telegram });
-      if (result.ok && (!telegram || telegram.ok)) {
-        toast('Bot created', data.displayName);
-        navigate({ view: 'chat', profile: data.name, sessionId: null });
-      }
+      navigate({ view: 'chat', profile: profileName, sessionId: null });
     } catch (err) {
-      setCreateResult({
-        steps: [{ step: 'profile', ok: false, error: (err as { publicError?: PublicError }).publicError }],
-      });
+      setFailed([
+        { step: 'profile', ok: false, error: (err as { publicError?: PublicError }).publicError },
+      ]);
     } finally {
       setCreating(false);
     }
   };
-
-  const footer = (opts?: { nextLabel?: string; onNext?: () => void }): React.JSX.Element => (
-    <div className="wizard-footer">
-      <button className="btn ghost" onClick={() => (step === 0 ? navigate({ view: 'connection' }) : go(step - 1))}>
-        {step === 0 ? 'Cancel' : 'Back'}
-      </button>
-      <button
-        className="btn primary"
-        disabled={!stepValid[step] || creating}
-        onClick={() => (opts?.onNext ? opts.onNext() : go(step + 1))}
-      >
-        {opts?.nextLabel ?? 'Continue'}
-      </button>
-    </div>
-  );
 
   return (
     <>
       {pickerOpen ? (
         <PersonaPicker
           onClose={() => setPickerOpen(false)}
-          onPick={(persona, soul) => {
+          onPick={(persona, pickedSoul) => {
             setPickerOpen(false);
-            // Seed identity too when the user hasn't filled it in yet — the
-            // library entry usually has a better role line than a blank field.
-            set({
-              soul,
-              role: data.role.trim() || persona.name,
-              description: data.description.trim() || persona.description.slice(0, 300),
-              displayName: data.displayName.trim() || persona.name,
-            });
-            toast('Persona inserted', persona.name);
+            setSoul(pickedSoul);
+            setPersonaName(persona.name);
+            setRole(persona.name);
+            setDescription(persona.description.slice(0, 300));
+            if (!displayName.trim()) setDisplayName(persona.name);
           }}
         />
       ) : null}
-      <aside className="wizard-rail" aria-label="Wizard steps">
-        {STEPS.map((label, i) => (
-          <button
-            key={label}
-            className={`wizard-step ${i === step ? 'current' : ''} ${i < step ? 'done' : ''}`}
-            onClick={() => i < step && go(i)}
-            disabled={i > step}
-          >
-            <span className="num">{i < step ? '✓' : i + 1}</span>
-            {label}
-          </button>
-        ))}
-      </aside>
       <main className="workspace">
         <div className="cmd-header">
           <div className="crumb">
-            <div className="crumb-path">New bot<span className="sep">/</span>{STEPS[step]}</div>
+            <div className="crumb-path">New bot</div>
           </div>
         </div>
         <div className="center-view">
-          <div className="center-col">
-            {step === 0 ? (
-              <>
-                <div className="view-title">Identity</div>
-                <div className="card">
-                  <div className="field-row">
-                    <div className="field">
-                      <label>Profile name (canonical, filesystem-safe)</label>
-                      <input
-                        type="text"
-                        value={data.name}
-                        placeholder="researcher"
-                        spellCheck={false}
-                        onChange={(e) => set({ name: e.target.value.toLowerCase() })}
-                      />
-                      {nameError ? <div className="err">{nameError}</div> : (
-                        <div className="hint">Stays stable after creation; the display name below can change freely.</div>
-                      )}
-                    </div>
-                    <div className="field">
-                      <label>Display name</label>
-                      <input
-                        type="text"
-                        value={data.displayName}
-                        placeholder="Researcher"
-                        onChange={(e) => set({ displayName: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="field">
-                    <label>Role / title</label>
-                    <input type="text" value={data.role} placeholder="Deep research" onChange={(e) => set({ role: e.target.value })} />
-                  </div>
-                  <div className="field">
-                    <label>Short description</label>
-                    <textarea value={data.description} onChange={(e) => set({ description: e.target.value })} />
-                  </div>
+          <div className="center-col" style={{ maxWidth: 560 }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <PersonaAvatar orb={{ paletteId: '', seed: profileName || 'new' }} size={56} />
+              <div>
+                <div className="view-title">Create a bot</div>
+                <div className="view-sub" style={{ marginTop: 2 }}>
+                  A name and a role is all it needs. Avatar, model, and Telegram are handled
+                  afterwards in the bot&apos;s settings.
                 </div>
-                <div className="card">
-                  <h3>Picture</h3>
-                  <div className="orb-editor">
-                    <div className="orb-preview">
-                      <PersonaAvatar orb={previewOrb} size={84} avatar={data.avatarDataUri} />
-                    </div>
-                    <div className="orb-controls">
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          className="btn"
-                          onClick={async () => {
-                            try {
-                              const picked = await unwrap(api().avatar.pick());
-                              if (picked) set({ avatarDataUri: picked });
-                            } catch (err) {
-                              reportError(err, 'Could not read that image');
-                            }
-                          }}
-                        >
-                          {data.avatarDataUri ? 'Change picture' : 'Upload picture'}
-                        </button>
-                        {data.avatarDataUri ? (
-                          <button className="btn ghost" onClick={() => set({ avatarDataUri: undefined })}>
-                            Use drawn avatar
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="hint">
-                        Optional. Without a picture the bot gets the drawn avatar below, which
-                        stays unique per bot.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  className="card"
-                  style={data.avatarDataUri ? { opacity: 0.55 } : undefined}
-                >
-                  <h3>Drawn avatar</h3>
-                  <div className="orb-editor">
-                    <div className="orb-preview">
-                      <PersonaAvatar orb={previewOrb} size={84} />
-                    </div>
-                    <div className="orb-controls">
-                      <div className="swatch-row" role="radiogroup" aria-label="Avatar colour">
-                        {AVATAR_PALETTES.map((p) => (
-                          <button
-                            key={p.id}
-                            role="radio"
-                            aria-checked={data.orb.paletteId === p.id}
-                            aria-label={p.name}
-                            title={p.name}
-                            className={`swatch ${data.orb.paletteId === p.id ? 'on' : ''}`}
-                            style={{ background: p.body }}
-                            onClick={() => set({ orb: { ...data.orb, paletteId: p.id } })}
-                          />
-                        ))}
-                      </div>
-                      <div className="seg-row" role="radiogroup" aria-label="Jar shape">
-                        {JAR_SHAPES.map((j) => (
-                          <button
-                            key={j}
-                            role="radio"
-                            aria-checked={resolved.jar === j}
-                            className={resolved.jar === j ? 'on' : ''}
-                            onClick={() => set({ orb: { ...data.orb, jar: j } })}
-                          >
-                            {j}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="seg-row" role="radiogroup" aria-label="Eyes">
-                        {EYE_STYLES.map((e) => (
-                          <button
-                            key={e}
-                            role="radio"
-                            aria-checked={resolved.eyes === e}
-                            className={resolved.eyes === e ? 'on' : ''}
-                            onClick={() => set({ orb: { ...data.orb, eyes: e } })}
-                          >
-                            {e}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="seg-row" role="radiogroup" aria-label="Pose">
-                        {POSES.map((po) => (
-                          <button
-                            key={po}
-                            role="radio"
-                            aria-checked={resolved.pose === po}
-                            className={resolved.pose === po ? 'on' : ''}
-                            onClick={() => set({ orb: { ...data.orb, pose: po } })}
-                          >
-                            {po}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="hint">
-                        Jar, eyes, and pose vary independently of colour, so two bots never rely on
-                        hue alone to tell apart.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {footer()}
-              </>
-            ) : null}
+              </div>
+            </div>
 
-            {step === 1 ? (
-              <>
-                <div className="view-title">Persona (SOUL)</div>
-                <p className="view-sub">
-                  Presets seed the editor once — they are visible starting text, not hidden prompts.
-                  Suggested sections: Role, Mission, Working style, Boundaries, Escalation rules, Output style.
-                </p>
-                <div className="card">
-                  <div className="preset-row">
-                    <button className="btn primary" onClick={() => setPickerOpen(true)}>
-                      Browse persona library…
-                    </button>
-                    {Object.keys(SOUL_PRESETS).map((p) => (
-                      <button
-                        key={p}
-                        className="btn"
-                        onClick={() => {
-                          if (!data.soul.trim() || window.confirm('Replace the current SOUL text with this preset?')) {
-                            set({ soul: SOUL_PRESETS[p] ?? '' });
-                          }
-                        }}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                    <button className="btn ghost" onClick={() => set({ soul: '' })}>
-                      Custom / clear
-                    </button>
-                  </div>
-                  <textarea
-                    className="soul-editor"
-                    value={data.soul}
-                    spellCheck={false}
-                    placeholder={'# Role\n…'}
-                    onChange={(e) => set({ soul: e.target.value })}
-                    aria-label="SOUL editor"
-                  />
-                  <div className="count-line">
-                    {data.soul.length.toLocaleString()} chars · ~{Math.ceil(data.soul.length / 4).toLocaleString()} tokens
-                  </div>
-                </div>
-                {footer()}
-              </>
-            ) : null}
-
-            {step === 2 ? (
-              <>
-                <div className="view-title">Capabilities</div>
-                <div className="card">
-                  <h3>Provider &amp; model</h3>
-                  {models === null ? (
-                    <div className="view-sub" style={{ marginTop: 0 }}>Loading providers…</div>
-                  ) : (
-                    <div className="field-row">
-                      <div className="field">
-                        <label>Provider</label>
-                        <select
-                          value={data.provider}
-                          onChange={(e) => {
-                            const p = models.providers.find((x) => x.slug === e.target.value);
-                            set({ provider: e.target.value, model: p?.models[0] ?? '' });
-                          }}
-                        >
-                          {models.providers.map((p) => (
-                            <option key={p.slug} value={p.slug} disabled={!p.authenticated}>
-                              {p.name}
-                              {p.authenticated ? '' : ' — no credentials'}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="hint">
-                          Only providers the server already has credentials for can run. Picking one
-                          without them creates a bot that fails on its first prompt.
-                        </div>
-                      </div>
-                      <div className="field">
-                        <label>Model</label>
-                        <select value={data.model} onChange={(e) => set({ model: e.target.value })}>
-                          {(models.providers.find((p) => p.slug === data.provider)?.models ?? []).map(
-                            (m) => (
-                              <option key={m} value={m}>
-                                {m}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="card">
-                  <h3>Approvals</h3>
-                  <div className="radio-cards">
-                    <button className={`radio-card ${data.approvalMode === 'require-approval' ? 'on' : ''}`} onClick={() => set({ approvalMode: 'require-approval' })}>
-                      <div>
-                        <div className="rc-title">Require approval for terminal and mutating tools (default)</div>
-                        <div className="rc-desc">The bot pauses and asks before risky operations.</div>
-                      </div>
-                    </button>
-                    <button className={`radio-card ${data.approvalMode === 'permissive' ? 'on' : ''}`} onClick={() => set({ approvalMode: 'permissive' })}>
-                      <div>
-                        <div className="rc-title">Permissive</div>
-                        <div className="rc-desc">Fewer interruptions; higher blast radius.</div>
-                      </div>
-                    </button>
-                  </div>
-                  {riskFlags.map((f, i) => (
-                    <div key={i} className="risk-flag">⚠ {f}</div>
-                  ))}
-                </div>
-                <div className="risk-flag">
-                  Profiles isolate Hermes state (config, memory, sessions) — they do not isolate
-                  server filesystem access. Tools, skills, and MCP servers are refined after creation
-                  in the bot&apos;s Capabilities tab, driven by what this Hermes version supports.
-                </div>
-                {footer()}
-              </>
-            ) : null}
-
-            {step === 3 ? (
-              <>
-                <div className="view-title">Telegram</div>
-                <p className="view-sub">
-                  Every persona needs its own unique Telegram bot token. Create one with Telegram&apos;s
-                  BotFather, copy the token, and paste it below. The token goes straight from the app
-                  core to Hermes and is never shown again.
-                </p>
-                <div className="card">
-                  <div className="field">
-                    <label>Bot token (from @BotFather)</label>
-                    <input
-                      type="password"
-                      value={data.telegramToken}
-                      autoComplete="off"
-                      placeholder="123456789:AA…"
-                      onChange={(e) => set({ telegramToken: e.target.value, telegramSkipped: false })}
-                    />
-                  </div>
-                  <div className="toggle-row">
-                    <div>
-                      <div className="tr-title">Respond only when mentioned</div>
-                      <div className="tr-desc">In groups, the bot stays silent unless @-mentioned.</div>
-                    </div>
-                    <button
-                      className={`switch ${data.telegramMentionOnly ? 'on' : ''}`}
-                      role="switch"
-                      aria-checked={data.telegramMentionOnly}
-                      aria-label="Mention only"
-                      onClick={() => set({ telegramMentionOnly: !data.telegramMentionOnly })}
-                    />
-                  </div>
-                  <div className="field" style={{ marginTop: 10 }}>
-                    <label>Allowed users (comma-separated, optional)</label>
-                    <input
-                      type="text"
-                      value={data.telegramAllowed}
-                      placeholder="your_username"
-                      spellCheck={false}
-                      onChange={(e) => set({ telegramAllowed: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="wizard-footer">
-                  <button className="btn ghost" onClick={() => go(step - 1)}>
-                    Back
-                  </button>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" onClick={() => { set({ telegramSkipped: true, telegramToken: '' }); go(4); }}>
-                      Set up later
-                    </button>
-                    <button className="btn primary" onClick={() => go(4)}>
-                      Continue
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            {step === 4 ? (
-              <>
-                <div className="view-title">Review</div>
-                <div className="card">
-                  <dl className="kv-list">
-                    <dt>Profile</dt>
-                    <dd className="mono">{data.name}</dd>
-                    <dt>Display name</dt>
-                    <dd>{data.displayName}{data.role ? ` — ${data.role}` : ''}</dd>
-                    <dt>Starting point</dt>
-                    <dd>{data.startingPoint === 'clone' ? `Clone of ${data.cloneFrom}` : 'Blank'}</dd>
-                    <dt>Model</dt>
-                    <dd className="mono">{data.provider ? `${data.provider} / ${data.model}` : 'server default'}</dd>
-                    <dt>SOUL</dt>
-                    <dd>{data.soul.trim() ? `${data.soul.length.toLocaleString()} characters` : 'default'}</dd>
-                    <dt>Approvals</dt>
-                    <dd>{data.approvalMode === 'require-approval' ? 'Required for terminal & mutations' : 'Permissive'}</dd>
-                    <dt>Telegram</dt>
-                    <dd>{data.telegramSkipped || !data.telegramToken ? 'Set up later' : 'Token provided; will configure after creation'}</dd>
-                  </dl>
-                  {riskFlags.map((f, i) => (
-                    <div key={i} className="risk-flag">⚠ {f}</div>
-                  ))}
-                </div>
-                {createResult ? (
-                  <div className="card">
-                    <h3>Creation progress</h3>
-                    {createResult.steps.map((s) => (
-                      <div key={s.step} className={`step-status ${s.ok ? 'ok' : 'fail'}`}>
-                        {s.ok ? '✓' : '✕'} {s.step === 'profile' ? 'Create Hermes profile' : s.step === 'soul' ? 'Write SOUL' : s.step === 'model' ? 'Set model' : s.step}
-                        {s.error ? ` — ${s.error.message}` : ''}
-                      </div>
-                    ))}
-                    {createResult.telegram ? (
-                      <div className={`step-status ${createResult.telegram.ok ? 'ok' : 'fail'}`}>
-                        {createResult.telegram.ok ? '✓' : '✕'} Configure Telegram
-                        {createResult.telegram.error ? ` — ${createResult.telegram.error.message}` : ''}
-                      </div>
-                    ) : null}
-                    {createResult.profileName && createResult.steps.some((s) => !s.ok || createResult.telegram?.ok === false) ? (
-                      <p className="view-sub">
-                        The profile <strong>{createResult.profileName}</strong> exists — nothing was rolled
-                        back. Fix the failed steps from the bot&apos;s settings tabs, or retry below.
-                      </p>
-                    ) : null}
-                    {createResult.profileName ? (
-                      <div className="row-actions">
-                        <button className="btn" onClick={() => navigate({ view: 'bot-settings', profile: createResult.profileName!, tab: 'overview' })}>
-                          Open bot settings
-                        </button>
-                        <button className="btn primary" onClick={() => navigate({ view: 'chat', profile: createResult.profileName!, sessionId: null })}>
-                          Start first thread
-                        </button>
-                      </div>
-                    ) : null}
+            <div className="card">
+              <div className="field">
+                <label>Name</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  placeholder="Marketing"
+                  autoFocus
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+                {nameError ? (
+                  <div className="err">{nameError}</div>
+                ) : profileName ? (
+                  <div className="hint">
+                    Hermes profile:{' '}
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{profileName}</span>
                   </div>
                 ) : null}
-                {footer({ nextLabel: creating ? 'Creating…' : 'Create bot', onNext: () => void create() })}
-              </>
+              </div>
+
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Role</label>
+                {personaName ? (
+                  <div className="toggle-row" style={{ paddingTop: 4 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="tr-title">{personaName}</div>
+                      <div className="tr-desc">{description || 'Persona from the library'}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+                      <button className="btn" onClick={() => setPickerOpen(true)}>
+                        Change
+                      </button>
+                      <button
+                        className="btn ghost"
+                        onClick={() => {
+                          setPersonaName('');
+                          setSoul('');
+                          setDescription('');
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={role}
+                        placeholder="Growth marketing"
+                        onChange={(e) => setRole(e.target.value)}
+                      />
+                      <button
+                        className="btn"
+                        style={{ flex: 'none' }}
+                        onClick={() => setPickerOpen(true)}
+                      >
+                        Browse…
+                      </button>
+                    </div>
+                    <div className="hint">
+                      Type one, or pick from the persona library — a picked persona also fills in
+                      the bot&apos;s instructions.
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {models && !provider ? (
+              <div className="risk-flag">
+                ⚠ The server has no authenticated model provider, so this bot cannot answer until
+                credentials are configured on the VPS.
+              </div>
             ) : null}
+
+            {failed ? (
+              <div className="card">
+                <h3>Creation result</h3>
+                {failed.map((s) => (
+                  <div key={s.step} className={`step-status ${s.ok ? 'ok' : 'fail'}`}>
+                    {s.ok ? '✓' : '✕'} {s.step}
+                    {s.error ? ` — ${s.error.message}` : ''}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="row-actions" style={{ justifyContent: 'flex-end' }}>
+              <button className="btn ghost" onClick={() => navigate({ view: 'connection' })}>
+                Cancel
+              </button>
+              <button className="btn primary" disabled={!canCreate} onClick={() => void create()}>
+                {creating ? 'Creating…' : 'Create bot'}
+              </button>
+            </div>
           </div>
         </div>
       </main>
