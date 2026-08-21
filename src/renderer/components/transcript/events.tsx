@@ -73,6 +73,50 @@ export function UserTurn({ event }: { event: UserMessageEvent }): React.JSX.Elem
   );
 }
 
+/**
+ * Describe a run of tool calls the way a person would: "Ran 2 commands,
+ * searched" rather than "3 tools terminal ×2, x_search". Names are bucketed
+ * by what the call actually did, since the raw tool names are an
+ * implementation detail of whichever toolset the profile has enabled.
+ */
+type ToolVerb = 'run' | 'read' | 'search' | 'write' | 'other';
+
+function toolVerb(name: string): ToolVerb {
+  if (/terminal|shell|bash|exec|command|sudo/i.test(name)) return 'run';
+  if (/write|edit|patch|create|append|apply/i.test(name)) return 'write';
+  if (/read|cat|open|fetch|get_file/i.test(name)) return 'read';
+  if (/search|grep|find|browse|web|lookup|query/i.test(name)) return 'search';
+  return 'other';
+}
+
+const PHRASES: Record<Exclude<ToolVerb, 'other'>, [string, (n: number) => string]> = {
+  run: ['Ran a command', (n) => `Ran ${n} commands`],
+  read: ['Read a file', (n) => `Read ${n} files`],
+  search: ['Searched', (n) => `Ran ${n} searches`],
+  write: ['Edited a file', (n) => `Edited ${n} files`],
+};
+
+export function summarizeTools(events: ToolEvent[]): string {
+  const counts = new Map<ToolVerb, number>();
+  const otherNames = new Set<string>();
+  for (const e of events) {
+    const verb = toolVerb(e.toolName);
+    counts.set(verb, (counts.get(verb) ?? 0) + 1);
+    if (verb === 'other') otherNames.add(e.toolName);
+  }
+  const parts: string[] = [];
+  for (const verb of ['run', 'read', 'search', 'write'] as const) {
+    const n = counts.get(verb);
+    if (!n) continue;
+    parts.push(n === 1 ? PHRASES[verb][0] : PHRASES[verb][1](n));
+  }
+  if (otherNames.size > 0) {
+    const names = [...otherNames].slice(0, 2).join(', ');
+    parts.push(otherNames.size > 2 ? `${names}, +${otherNames.size - 2}` : names);
+  }
+  return parts.join(', ') || `${events.length} tools`;
+}
+
 function toolIcon(name: string): IconName {
   if (/terminal|shell|bash|exec/i.test(name)) return 'terminal';
   if (/web|search|http|fetch|browse/i.test(name)) return 'globe';
@@ -92,30 +136,27 @@ export function ToolRow({ event }: { event: ToolEvent }): React.JSX.Element {
   return (
     <div className="tool-row" id={`evt-${event.id}`}>
       <button
-        className="tool-row-head"
+        className={`tool-row-head ${event.status}`}
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-label={`Tool ${event.toolName}, ${event.status}`}
       >
-        <Icon name={toolIcon(event.toolName)} size={15} />
-        <span className="tool-name">{event.toolName}</span>
-        <span className={`tool-status ${event.status}`}>
-          {event.status === 'running' ? (
-            <>
-              <span className="run-lines">
-                <i />
-                <i />
-                <i />
-              </span>
-              running
-            </>
-          ) : event.status === 'failed' ? (
-            'failed'
-          ) : (
-            <>{elapsed ?? 'done'}</>
-          )}
-          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={13} />
+        <span className="tool-line">
+          {summarizeTools([event])}
+          <span className="tool-line-name">{event.toolName}</span>
         </span>
+        {event.status === 'running' ? (
+          <span className="run-lines" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : event.status === 'failed' ? (
+          <span className="tool-line-failed">failed</span>
+        ) : elapsed ? (
+          <span className="tool-line-elapsed">{elapsed}</span>
+        ) : null}
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
       </button>
       {open ? (
         <div className="tool-detail">
@@ -160,46 +201,31 @@ export function ToolGroup({ events }: { events: ToolEvent[] }): React.JSX.Elemen
 
   if (events.length === 1) return <ToolRow event={events[0]!} />;
 
-  // "read_file ×5, terminal, search_files ×2"
-  const counts = new Map<string, number>();
-  for (const e of events) counts.set(e.toolName, (counts.get(e.toolName) ?? 0) + 1);
-  const names = [...counts.entries()]
-    .map(([name, n]) => (n > 1 ? `${name} ×${n}` : name))
-    .slice(0, 3)
-    .join(', ');
-  const more = counts.size > 3 ? `, +${counts.size - 3} more` : '';
-
   const totalMs = events.reduce((sum, e) => sum + (e.elapsedMs ?? 0), 0);
-  const elapsed = totalMs > 0 ? (totalMs > 1000 ? `${(totalMs / 1000).toFixed(1)}s` : `${totalMs}ms`) : null;
+  const elapsed =
+    totalMs > 0 ? (totalMs > 1000 ? `${(totalMs / 1000).toFixed(1)}s` : `${totalMs}ms`) : null;
 
   return (
     <div className="tool-group">
       <button
-        className="tool-row tool-row-head tool-group-head"
+        className="tool-row-head"
         onClick={() => setOverride(!open)}
         aria-expanded={open}
         aria-label={`${events.length} tool calls, ${failed > 0 ? `${failed} failed` : running ? 'running' : 'complete'}`}
       >
-        <Icon name="wrench" size={15} />
-        <span className="tool-name">{events.length} tools</span>
-        <span className="tool-group-names">{names}{more}</span>
-        <span className={`tool-status ${failed > 0 ? 'failed' : running ? 'running' : 'complete'}`}>
-          {running ? (
-            <>
-              <span className="run-lines">
-                <i />
-                <i />
-                <i />
-              </span>
-              running
-            </>
-          ) : failed > 0 ? (
-            `${failed} failed`
-          ) : (
-            (elapsed ?? 'done')
-          )}
-          <Icon name={open ? 'chevron-down' : 'chevron-right'} size={13} />
-        </span>
+        <span className="tool-line">{summarizeTools(events)}</span>
+        {running ? (
+          <span className="run-lines" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : failed > 0 ? (
+          <span className="tool-line-failed">{failed} failed</span>
+        ) : elapsed ? (
+          <span className="tool-line-elapsed">{elapsed}</span>
+        ) : null}
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={12} />
       </button>
       {open ? (
         <div className="tool-group-body">

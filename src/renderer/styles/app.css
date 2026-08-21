@@ -820,94 +820,102 @@ button:focus-visible,
   color: var(--accent-amber);
 }
 
-.tool-row {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  overflow: hidden;
+/* Tool calls -----------------------------------------------------------------
+   Scaffolding, not conversation: a quiet line of text that sits between turns
+   and opens on demand. No card, no full-bleed border — those made a run of
+   calls louder than the reply it produced. */
+.tool-row,
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  /* Claw back part of the transcript's 24px turn gap: these lines belong with
+     the message above them, not floating between two turns. */
+  margin: -7px 0;
   user-select: none;
 }
 
 .tool-row-head {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 5px 10px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  gap: 7px;
+  padding: 2px 0;
+  max-width: 100%;
+  font-size: 12.5px;
+  color: var(--text-muted);
   text-align: left;
+  /* Without this the button shrink-wraps to a narrow column and the summary
+     wraps onto three lines. */
+  white-space: nowrap;
+  transition: color var(--t-fast);
 }
 
 .tool-row-head:hover {
-  background: var(--surface-hover);
+  color: var(--text-secondary);
 }
 
-.tool-name {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-primary);
-  flex: none;
-}
-
-/* Grouped tool calls -------------------------------------------------------
-   A run of tool calls collapses to one line; expanding reveals the individual
-   calls, each of which still expands to its own input/output. */
-.tool-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.tool-group-head {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-}
-
-.tool-group-names {
-  font-size: 11.5px;
-  color: var(--text-muted);
-  white-space: nowrap;
+.tool-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
+}
+
+.tool-line-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+
+.tool-line-elapsed {
+  font-size: 11.5px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-line-failed {
+  font-size: 11.5px;
+  color: var(--danger);
+}
+
+.tool-row-head.failed .tool-line {
+  color: var(--danger);
 }
 
 .tool-group-body {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-left: 16px;
+  gap: 2px;
+  padding-left: 14px;
+  margin-left: 2px;
   border-left: 1px solid var(--border-subtle);
-  margin-left: 10px;
 }
 
-.tool-status {
-  margin-left: auto;
-  font-size: 11.5px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* Nested rows sit tight; only the outermost item borrows from the turn gap. */
+.tool-group-body .tool-row {
+  margin: 0;
 }
-
-.tool-status.running { color: var(--accent-cyan); }
-.tool-status.complete { color: var(--text-muted); }
-.tool-status.failed { color: var(--danger); }
 
 .tool-detail {
-  border-top: 1px solid var(--border-subtle);
-  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 9px 11px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-secondary);
   white-space: pre-wrap;
   max-height: 260px;
   overflow: auto;
   user-select: text;
+  align-self: stretch;
 }
 
 .tool-detail .lbl {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
