@@ -1,7 +1,5 @@
 /** Command Header (spec §7.1): breadcrumb, run state, connection capsule. */
-import { useState } from 'react';
 import { useStore } from '../../state/store';
-import { ContextMenu, type MenuItem } from '../common/ui';
 import { Icon } from '../common/Icon';
 import type { RunState } from '@shared/contracts';
 
@@ -25,7 +23,6 @@ export function CommandHeader({
   const runState = useStore((s) => (sessionId ? (s.runStates[sessionId] ?? 'ready') : 'ready'));
   const connection = useStore((s) => s.connection);
   const navigate = useStore((s) => s.navigate);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   const showThreadDeck = useStore((s) => s.prefs.showThreadDeck);
   const toggleThreadDeck = useStore((s) => s.toggleThreadDeck);
@@ -41,22 +38,6 @@ export function CommandHeader({
         ? 'offline'
         : 'reconnecting';
 
-  const menuItems: MenuItem[] = [
-    {
-      label: 'Configure bot',
-      onSelect: () => navigate({ view: 'bot-settings', profile, tab: 'overview' }),
-    },
-    {
-      label: 'Connection health',
-      onSelect: () => navigate({ view: 'connection' }),
-    },
-    { label: '', divider: true },
-    {
-      label: 'Application settings',
-      onSelect: () => navigate({ view: 'settings' }),
-    },
-  ];
-
   return (
     <header className="cmd-header">
       <button
@@ -70,7 +51,13 @@ export function CommandHeader({
       </button>
       <div className="crumb">
         <div className="crumb-path">
-          {bot?.displayName ?? profile}
+          <button
+            className="crumb-bot"
+            onClick={() => navigate({ view: 'bot-settings', profile, tab: 'overview' })}
+            title="Bot settings"
+          >
+            {bot?.displayName ?? profile}
+          </button>
           <span className="sep">/</span>
           <span style={{ color: thread ? undefined : 'var(--text-muted)' }}>
             {thread?.title ?? 'New thread'}
@@ -102,12 +89,12 @@ export function CommandHeader({
       </button>
       <button
         className="icon-btn"
-        aria-label="More actions"
-        onClick={(e) => setMenu({ x: e.clientX, y: e.clientY })}
+        aria-label={`Configure ${bot?.displayName ?? profile}`}
+        title="Bot settings"
+        onClick={() => navigate({ view: 'bot-settings', profile, tab: 'overview' })}
       >
-        <Icon name="more" size={18} />
+        <Icon name="settings" size={18} />
       </button>
-      {menu ? <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} /> : null}
     </header>
   );
 }

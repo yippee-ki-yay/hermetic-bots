@@ -590,6 +590,18 @@ button:focus-visible,
   text-overflow: ellipsis;
 }
 
+.crumb-bot {
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  border-radius: 4px;
+  transition: color var(--t-fast);
+}
+
+.crumb-bot:hover {
+  color: var(--accent-cyan);
+}
+
 .crumb-path .sep {
   color: var(--text-muted);
   font-weight: 400;
