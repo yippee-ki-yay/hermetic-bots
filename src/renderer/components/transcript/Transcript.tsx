@@ -143,6 +143,10 @@ export function Transcript({
         ) : null}
         {events === undefined ? (
           <div className="sys-marker">Loading history…</div>
+        ) : events.length === 0 ? (
+          // An explicitly empty log, rather than a blank pane that hides a
+          // history that failed to load.
+          <div className="sys-marker">No messages in this thread yet</div>
         ) : (
           items.map((item) =>
             item.type === 'tools' ? (

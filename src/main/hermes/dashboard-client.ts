@@ -237,8 +237,11 @@ export class DashboardClient {
     }
 
     if (res.status === 404 && opts.notFoundOk) {
-      // Hermes persists a session row lazily on its first completed turn, so
-      // a freshly created thread legitimately has no messages yet.
+      // Hermes persists a session row on its first completed turn, so a
+      // freshly created thread legitimately has none yet. Logged because the
+      // same 404 is what a missing `profile` looks like, and that bug is
+      // otherwise invisible — it just renders an empty conversation.
+      log.warn('rest', `${method} ${path} -> 404 (treated as empty)`);
       return null as T;
     }
 
@@ -364,11 +367,15 @@ export class DashboardClient {
     return unwrapSessions(data);
   }
 
-  async getMessages(sessionId: string): Promise<unknown[]> {
+  /**
+   * `profile` is required for anything outside the launch profile: without it
+   * Hermes answers "Session not found" even when the session exists.
+   */
+  async getMessages(sessionId: string, profile?: string): Promise<unknown[]> {
     const data = await this.request<unknown>(
       'GET',
       `/api/sessions/${encodeURIComponent(sessionId)}/messages`,
-      { notFoundOk: true },
+      { profile, notFoundOk: true },
     );
     if (Array.isArray(data)) return data;
     if (data && typeof data === 'object' && Array.isArray((data as { messages?: unknown[] }).messages)) {
@@ -377,20 +384,22 @@ export class DashboardClient {
     return [];
   }
 
-  async renameSession(sessionId: string, title: string): Promise<void> {
+  async renameSession(sessionId: string, title: string, profile?: string): Promise<void> {
     await this.request('PATCH', `/api/sessions/${encodeURIComponent(sessionId)}`, {
       body: { title },
+      profile,
     });
   }
 
-  async archiveSession(sessionId: string, archived: boolean): Promise<void> {
+  async archiveSession(sessionId: string, archived: boolean, profile?: string): Promise<void> {
     await this.request('PATCH', `/api/sessions/${encodeURIComponent(sessionId)}`, {
       body: { archived },
+      profile,
     });
   }
 
-  async deleteSession(sessionId: string): Promise<void> {
-    await this.request('DELETE', `/api/sessions/${encodeURIComponent(sessionId)}`);
+  async deleteSession(sessionId: string, profile?: string): Promise<void> {
+    await this.request('DELETE', `/api/sessions/${encodeURIComponent(sessionId)}`, { profile });
   }
 
   // --- capabilities-related reads -----------------------------------------

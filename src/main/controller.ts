@@ -603,7 +603,7 @@ export class AppController {
   }
 
   async loadHistory(profileName: string, sessionId: string): Promise<TranscriptEvent[]> {
-    const raw = await this.rest.getMessages(sessionId);
+    const raw = await this.rest.getMessages(sessionId, profileName);
     const ctx: NormalizerContext = { profileName, sessionId };
     const events = raw.flatMap((m, i) => normalizeHistoryMessage(m, ctx, i));
     this.transcripts.set(sessionId, events);
@@ -689,14 +689,14 @@ export class AppController {
   }
 
   async renameSession(sessionId: string, title: string): Promise<void> {
-    await this.rest.renameSession(sessionId, title);
     const profileName = this.sessionProfile.get(sessionId);
+    await this.rest.renameSession(sessionId, title, profileName);
     if (profileName) await this.refreshThreads(profileName);
   }
 
   async archiveSession(sessionId: string, archived: boolean): Promise<void> {
-    await this.rest.archiveSession(sessionId, archived);
     const profileName = this.sessionProfile.get(sessionId);
+    await this.rest.archiveSession(sessionId, archived, profileName);
     if (profileName) await this.refreshThreads(profileName);
   }
 
@@ -717,7 +717,7 @@ export class AppController {
     try {
       await this.ws.call('session.delete', { session_id: sessionId, profile: profileName });
     } catch {
-      await this.rest.deleteSession(sessionId);
+      await this.rest.deleteSession(sessionId, profileName);
     }
     this.transcripts.delete(sessionId);
     this.sessionProfile.delete(sessionId);
@@ -842,7 +842,7 @@ export class AppController {
     for (const pending of [...this.pendingPrompts.values()]) {
       if (pending.state !== 'delivery-unknown' && pending.state !== 'submitting') continue;
       try {
-        const raw = await this.rest.getMessages(pending.sessionId);
+        const raw = await this.rest.getMessages(pending.sessionId, pending.profileName);
         const found = raw.some((m) => {
           if (!m || typeof m !== 'object') return false;
           const mm = m as Record<string, unknown>;
