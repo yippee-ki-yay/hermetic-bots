@@ -48,6 +48,39 @@ export function BotDetails({ profile, tab }: { profile: string; tab: BotTab }): 
   const [confirmRemoveToken, setConfirmRemoveToken] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
 
+  // Name and job title are app-owned labels, editable at any time; the Hermes
+  // profile name behind them stays fixed.
+  const [identityName, setIdentityName] = useState('');
+  const [identityRole, setIdentityRole] = useState('');
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const identityDirty =
+    identityName !== (bot?.displayName ?? '') || identityRole !== (bot?.role ?? '');
+
+  useEffect(() => {
+    // Re-seed when switching bots, or when a rename lands from elsewhere.
+    setIdentityName(bot?.displayName ?? '');
+    setIdentityRole(bot?.role ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, bot?.displayName, bot?.role]);
+
+  const saveIdentity = async (): Promise<void> => {
+    setSavingIdentity(true);
+    try {
+      await unwrap(
+        api().bots.setOrb({
+          profileName: profile,
+          displayName: identityName.trim(),
+          role: identityRole.trim(),
+        }),
+      );
+      toast('Bot updated', identityName.trim());
+    } catch (err) {
+      reportError(err, 'Could not save the name');
+    } finally {
+      setSavingIdentity(false);
+    }
+  };
+
   useEffect(() => {
     setConfig(null);
     setSoulDraft(null);
@@ -192,6 +225,54 @@ export function BotDetails({ profile, tab }: { profile: string; tab: BotTab }): 
 
           {tab === 'overview' ? (
             <>
+              <div className="card">
+                <h3>Identity</h3>
+                <div className="field-row">
+                  <div className="field">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={identityName}
+                      placeholder={profile}
+                      onChange={(e) => setIdentityName(e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Job title</label>
+                    <input
+                      type="text"
+                      value={identityRole}
+                      placeholder="Product Manager"
+                      onChange={(e) => setIdentityRole(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="hint" style={{ marginTop: -4 }}>
+                  Both are labels this app owns. The Hermes profile stays{' '}
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{profile}</span>, because its
+                  routines, gateway, and paths on the server refer to it by that name.
+                </div>
+                <div className="row-actions">
+                  <button
+                    className="btn ghost"
+                    disabled={!identityDirty || savingIdentity}
+                    onClick={() => {
+                      setIdentityName(bot?.displayName ?? '');
+                      setIdentityRole(bot?.role ?? '');
+                    }}
+                  >
+                    Discard
+                  </button>
+                  <button
+                    className="btn primary"
+                    disabled={!identityDirty || savingIdentity || !identityName.trim()}
+                    onClick={() => void saveIdentity()}
+                  >
+                    {savingIdentity ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+
               <div className="card">
                 <dl className="kv-list">
                   <dt>Description</dt>

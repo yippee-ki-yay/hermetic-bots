@@ -131,7 +131,7 @@ export function NewBotWizard(_props: { step: number }): React.JSX.Element {
               <div>
                 <div className="view-title">Create a bot</div>
                 <div className="view-sub" style={{ marginTop: 2 }}>
-                  A name and a role is all it needs. Avatar, model, and Telegram are handled
+                  A name and a job title is all it needs. Avatar, model, and Telegram are handled
                   afterwards in the bot&apos;s settings.
                 </div>
               </div>
@@ -158,7 +158,7 @@ export function NewBotWizard(_props: { step: number }): React.JSX.Element {
               </div>
 
               <div className="field" style={{ marginBottom: 0 }}>
-                <label>Role</label>
+                <label>Job title</label>
                 {personaName ? (
                   <div className="toggle-row" style={{ paddingTop: 4 }}>
                     <div style={{ minWidth: 0 }}>
@@ -200,7 +200,7 @@ export function NewBotWizard(_props: { step: number }): React.JSX.Element {
                     </div>
                     <div className="hint">
                       Type one, or pick from the persona library — a picked persona also fills in
-                      the bot&apos;s instructions.
+                      the bot&apos;s instructions. Both are editable later.
                     </div>
                   </>
                 )}

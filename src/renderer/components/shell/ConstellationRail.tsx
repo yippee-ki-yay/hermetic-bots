@@ -1,7 +1,7 @@
 /**
- * Bot roster rail: constellation persona marks paired with the bot name and
- * role, plus global navigation (spec §7.1, with the expanded-roster layout
- * requested for v1 so identity reads at a glance rather than on hover).
+ * Bot roster rail: each persona's avatar paired with its name and job title,
+ * plus global navigation (spec §7.1, with the expanded-roster layout requested
+ * for v1 so identity reads at a glance rather than on hover).
  */
 import { useStore } from '../../state/store';
 import { PersonaAvatar } from './PersonaAvatar';

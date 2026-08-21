@@ -369,7 +369,22 @@ export function createDemoBridge(): HermesApi {
       delete: () => ok(true),
       rename: () => ok(true),
       setDescription: () => ok(true),
-      setOrb: () => ok(true),
+      setOrb: ({ profileName, displayName, role, orb }) => {
+        // Mirrors the controller: merge only what was supplied, then push the
+        // update, so renaming is reviewable without a server.
+        const bot = bots.find((b) => b.profileName === profileName);
+        if (bot) {
+          const updated = {
+            ...bot,
+            ...(displayName !== undefined ? { displayName } : {}),
+            ...(role !== undefined ? { role } : {}),
+            ...(orb !== undefined ? { orb } : {}),
+          };
+          bots.splice(bots.indexOf(bot), 1, updated);
+          emit({ type: 'bot.updated', bot: updated });
+        }
+        return ok(true);
+      },
       getConfig: () =>
         ok({
           soul: '# Role\nYou are Researcher, a rigorous long-form research persona.\n\n# Mission\nProduce careful, sourced analysis.\n\n# Boundaries\nNever fabricate citations. Escalate paywalled sources.',

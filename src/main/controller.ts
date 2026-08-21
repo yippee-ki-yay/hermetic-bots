@@ -448,7 +448,13 @@ export class AppController {
 
   setOrbMetadata(profileName: string, entry: { displayName?: string; role?: string; orb?: OrbDefinition }): void {
     const existing = this.settings.orbFor(this.serverFingerprint, profileName) ?? {};
-    this.settings.setOrb(this.serverFingerprint, profileName, { ...existing, ...entry });
+    // Merge only what was actually supplied. Optional IPC fields arrive as
+    // explicit `undefined`, so a plain spread would let "rename this bot"
+    // silently erase its job title and avatar.
+    const patch = Object.fromEntries(
+      Object.entries(entry).filter(([, v]) => v !== undefined),
+    ) as typeof entry;
+    this.settings.setOrb(this.serverFingerprint, profileName, { ...existing, ...patch });
     this.republishBot(profileName);
   }
 
