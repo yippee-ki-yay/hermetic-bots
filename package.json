@@ -17,7 +17,8 @@
     "mock-server": "node tests/mock/hermes-mock-server.mjs",
     "package": "electron-vite build && electron-builder --mac --config electron-builder.yml",
     "icon": "electron scripts/make-icon.cjs",
-    "personas": "node scripts/fetch-personas.mjs"
+    "personas": "node scripts/fetch-personas.mjs",
+    "screenshot": "electron scripts/screenshot.cjs"
   },
   "dependencies": {
     "react": "^19.2.8",
