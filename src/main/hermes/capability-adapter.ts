@@ -1,5 +1,5 @@
 /**
- * Capability adapter (spec §12.5). Probes only what the visible feature set
+ * Capability adapter. Probes only what the visible feature set
  * needs, once per connection, and produces a single Capabilities object.
  * Version checks live here, never scattered through React components.
  */
@@ -59,7 +59,7 @@ export async function detectCapabilities(
   for (const { key, ok } of results) {
     (caps as unknown as Record<string, boolean | string | undefined>)[key] = ok;
   }
-  // cron manage deferred post-MVP (spec §7.4); keep detection cheap for now.
+  // cron manage deferred post-MVP; keep detection cheap for now.
   caps.cronManage = false;
 
   log.info(

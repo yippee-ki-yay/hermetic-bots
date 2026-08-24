@@ -1,4 +1,4 @@
-/** Thread Deck (spec §7.1): sessions for the selected bot. */
+/** Thread Deck: sessions for the selected bot. */
 import { useMemo, useState } from 'react';
 import { useStore, type ThreadFilter } from '../../state/store';
 import { api, unwrap } from '../../app/api';

@@ -1,7 +1,7 @@
 /**
  * The complete renderer-visible API surface. Every method maps to one
  * allowlisted, zod-validated IPC channel; there is no generic invoke,
- * fetch, path, or exec bridge (spec §11.2).
+ * fetch, path, or exec bridge.
  */
 import type {
   AppPreferences,

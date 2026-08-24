@@ -1,7 +1,7 @@
 /**
  * Thin wrapper over Electron safeStorage (macOS Keychain-backed).
  * Used for optional draft persistence. Transient secrets (Telegram tokens,
- * secret.respond values) are deliberately never persisted at all (spec §11.5).
+ * secret.respond values) are deliberately never persisted at all.
  */
 import { safeStorage } from 'electron';
 import { log } from '../logging/logger';

@@ -1,4 +1,4 @@
-/** Bot details route with tabs (spec §7.4). */
+/** Bot details route with tabs. */
 import { useEffect, useState } from 'react';
 import { useStore, type BotTab } from '../../state/store';
 import { api, unwrap } from '../../app/api';
@@ -459,7 +459,7 @@ export function BotDetails({ profile, tab }: { profile: string; tab: BotTab }): 
               <h3>Routines</h3>
               <p className="view-sub" style={{ marginTop: 0 }}>
                 Profile-scoped scheduled routines arrive after the MVP chat and configuration flows are
-                stable (spec §7.4). Existing cron jobs on the server keep running unchanged.
+                stable. Existing cron jobs on the server keep running unchanged.
               </p>
             </div>
           ) : null}

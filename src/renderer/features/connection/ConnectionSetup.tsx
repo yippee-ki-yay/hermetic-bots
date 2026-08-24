@@ -1,4 +1,4 @@
-/** First-launch welcome + connection setup (spec §6.1, §7.2). */
+/** First-launch welcome + connection setup. */
 import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap } from '../../app/api';

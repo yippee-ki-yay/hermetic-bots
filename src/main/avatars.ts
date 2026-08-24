@@ -4,7 +4,7 @@
  * The renderer never names a path: it asks the main process to open the
  * native picker, and main reads, center-crops, downscales, and re-encodes the
  * image itself. That keeps the "no arbitrary filesystem bridge" rule intact
- * (spec §11.2) while letting the user set a real picture per persona.
+ * while letting the user set a real picture per persona.
  *
  * Processed avatars live under userData/avatars as ordinary image files and
  * reach the renderer as `data:` URIs, which the CSP allows for img-src.

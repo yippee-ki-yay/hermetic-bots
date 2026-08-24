@@ -1,5 +1,5 @@
 /**
- * Approval, clarification, sudo, and secret request panels (spec §6.6, §7.1).
+ * Approval, clarification, sudo, and secret request panels.
  * Deliberate button presses only — Enter never approves. The secret value is
  * sent straight over IPC and never enters store state or persistence.
  */

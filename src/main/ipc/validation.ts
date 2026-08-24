@@ -1,5 +1,5 @@
 /**
- * Typed, allowlisted IPC (spec §11.2). Every invoke handler validates its
+ * Typed, allowlisted IPC. Every invoke handler validates its
  * payload with zod before executing, and every thrown error is converted to a
  * PublicError so raw internals never reach the renderer.
  */

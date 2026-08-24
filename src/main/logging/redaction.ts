@@ -1,5 +1,5 @@
 /**
- * Secret redaction (spec §15.3). Two layers:
+ * Secret redaction. Two layers:
  *  1. Pattern redaction for well-known secret shapes.
  *  2. Exact-value redaction for secrets the app has actually handled this
  *     session (registered at the moment they pass through the main process).

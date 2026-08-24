@@ -1,5 +1,5 @@
 /**
- * Host-key handling (spec §6.1, §16). We never pass StrictHostKeyChecking=no
+ * Host-key handling. We never pass StrictHostKeyChecking=no
  * and never auto-accept changed keys. Unknown hosts surface an exact SHA256
  * fingerprint for explicit confirmation; accepting appends the scanned key to
  * ~/.ssh/known_hosts via normal OpenSSH tooling.

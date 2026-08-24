@@ -5,7 +5,7 @@
  *
  * A persona's look is 5 jar shapes × 4 eye styles × 2 poses × 10 palettes,
  * so two bots differ in silhouette as well as colour and identity never rests
- * on colour alone (spec §8.5, §10).
+ * on colour alone.
  *
  * Anything not chosen explicitly is derived from the profile's seed, so an
  * existing bot gets a stable, distinct crab without any stored preference.

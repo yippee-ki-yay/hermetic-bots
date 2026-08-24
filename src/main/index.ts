@@ -33,7 +33,7 @@ if (!gotLock) {
     const win = createMainWindow(controller.settings, preloadPath);
     controller.attachWindow(win);
 
-    // Reconnect to the last server on launch when enabled (spec §7.6).
+    // Reconnect to the last server on launch when enabled.
     if (controller.settings.preferences.reconnectOnLaunch && controller.settings.connection) {
       controller.reconnect().catch((err) => {
         log.warn('startup', `auto-reconnect failed: ${(err as Error).message}`);
@@ -52,7 +52,7 @@ if (!gotLock) {
   });
 
   app.on('window-all-closed', () => {
-    // Closing the app closes the tunnel; remote services keep running (spec §11.4).
+    // Closing the app closes the tunnel; remote services keep running.
     void controller.disconnect().finally(() => app.quit());
   });
 

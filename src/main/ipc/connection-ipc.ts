@@ -84,7 +84,7 @@ export function registerConnectionIpc(controller: AppController): void {
     return true;
   });
 
-  // --- drafts (optional encrypted persistence, spec §7.1) ------------------
+  // --- drafts (optional encrypted persistence) ------------------
 
   handle('draft.get', z.object({ key: z.string().max(256) }), ({ key }) => {
     const blob = controller.settings.getEncryptedDraft(key);
@@ -107,7 +107,7 @@ export function registerConnectionIpc(controller: AppController): void {
     return true;
   });
 
-  // --- external links (spec §11.3): vetted https via system browser only ---
+  // --- external links: vetted https via system browser only ---
 
   handle('external.open', externalUrlSchema, async ({ url }) => {
     const parsed = new URL(url);

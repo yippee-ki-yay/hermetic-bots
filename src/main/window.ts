@@ -1,5 +1,5 @@
 /**
- * Hardened BrowserWindow (spec §11.3): sandboxed renderer, context isolation,
+ * Hardened BrowserWindow: sandboxed renderer, context isolation,
  * strict CSP, blocked navigation, vetted external links, denied permissions.
  */
 import { BrowserWindow, session, shell, app } from 'electron';
@@ -33,7 +33,7 @@ export function hardenSession(): void {
     });
   });
 
-  // Deny every permission request; the app needs none (spec §11.3).
+  // Deny every permission request; the app needs none.
   ses.setPermissionRequestHandler((_wc, permission, callback) => {
     log.warn('security', `denied permission request: ${permission}`);
     callback(false);
@@ -71,7 +71,7 @@ export function createMainWindow(settings: SettingsStore, preloadPath: string): 
   win.on('resized', saveBounds);
   win.on('moved', saveBounds);
 
-  // Block navigation away from the app (spec §11.3).
+  // Block navigation away from the app.
   win.webContents.on('will-navigate', (event, url) => {
     const devUrl = process.env.ELECTRON_RENDERER_URL;
     if (devUrl && url.startsWith(devUrl)) return;

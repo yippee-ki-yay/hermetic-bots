@@ -1,4 +1,4 @@
-/** Activity Strip (spec §7.1): at most three concise live items. */
+/** Activity Strip: at most three concise live items. */
 import { useMemo } from 'react';
 import { useStore } from '../../state/store';
 import { Icon } from '../common/Icon';

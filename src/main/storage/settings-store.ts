@@ -1,5 +1,5 @@
 /**
- * Versioned JSON settings store (spec §11.5). Holds only nonsecret data:
+ * Versioned JSON settings store. Holds only nonsecret data:
  * connection metadata, prefs, orb/display metadata, last route, drafts
  * (drafts are stored encrypted via secure-store when available).
  */
@@ -38,7 +38,7 @@ interface SettingsShape {
   preferences: AppPreferences;
   lastRoute?: string;
   windowBounds?: { x?: number; y?: number; width: number; height: number };
-  /** Keyed `${serverFingerprint}::${profileName}` (spec §11.5). */
+  /** Keyed `${serverFingerprint}::${profileName}`. */
   orbMetadata: Record<string, OrbMetadataEntry>;
   /** Encrypted draft payloads keyed by draft key; values are base64 safeStorage blobs. */
   encryptedDrafts: Record<string, string>;

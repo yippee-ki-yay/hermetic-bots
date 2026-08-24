@@ -4,8 +4,8 @@
  * Everything else is inferred: the avatar is derived from the profile name,
  * the provider/model come from whatever the server is authenticated for, and
  * Telegram is deliberately left for the bot's settings once it exists. The
- * five-step wizard the spec described (§7.3) collapsed to this because every
- * other field has a sane default and stays editable afterwards.
+ * The original five-step wizard collapsed to this because every other field
+ * has a sane default and stays editable afterwards.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';

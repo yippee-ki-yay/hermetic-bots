@@ -48,8 +48,6 @@ the internet to make that possible.
 
 ## Security model
 
-The short version — the long version is in [`docs/SECURITY.md`](docs/SECURITY.md).
-
 | | |
 |---|---|
 | **Transport** | System OpenSSH, spawned as an argv array. Local forward binds `127.0.0.1` only. Never `StrictHostKeyChecking=no`; changed host keys are refused outright. |
@@ -121,5 +119,3 @@ formatting follows [Hermes' own
 guidance](https://hermes-agent.nousresearch.com/docs/user-guide/features/personality)
 and the [Soul Spec](https://github.com/clawsouls/soulspec). Full notices in
 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
-
-Built from [`HERMES-BOTS-BUILD-SPEC.md`](HERMES-BOTS-BUILD-SPEC.md).

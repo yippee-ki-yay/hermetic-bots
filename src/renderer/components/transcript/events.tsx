@@ -1,4 +1,4 @@
-/** Transcript event renderers (spec §7.1): open work log, not chat bubbles. */
+/** Transcript event renderers: open work log, not chat bubbles. */
 import { useState } from 'react';
 import type {
   AssistantMessageEvent,
@@ -125,7 +125,7 @@ function toolIcon(name: string): IconName {
 }
 
 export function ToolRow({ event }: { event: ToolEvent }): React.JSX.Element {
-  // Collapsed by default after completion (spec §7.1).
+  // Collapsed by default after completion.
   const [open, setOpen] = useState(false);
   const elapsed =
     event.elapsedMs !== undefined

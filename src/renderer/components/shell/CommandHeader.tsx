@@ -1,4 +1,4 @@
-/** Command Header (spec §7.1): breadcrumb, run state, connection capsule. */
+/** Command Header: breadcrumb, run state, connection capsule. */
 import { useStore } from '../../state/store';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../common/Icon';

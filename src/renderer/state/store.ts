@@ -1,5 +1,5 @@
 /**
- * Renderer state (spec §14). The main process owns truth; this store holds
+ * Renderer state. The main process owns truth; this store holds
  * view models replenished over IPC plus purely local UI state.
  */
 import { create } from 'zustand';

@@ -1,5 +1,5 @@
 /**
- * Command Composer (spec §7.1): rectangular command dock. Enter sends
+ * Command Composer: rectangular command dock. Enter sends
  * (reversible in preferences); during a run the send control becomes Stop and
  * additional submissions visibly steer.
  */
@@ -80,7 +80,7 @@ export function Composer({
         navigate({ view: 'chat', profile, sessionId: sid });
       }
     } catch (err) {
-      // Restore the draft so nothing is silently lost (spec §2.4).
+      // Restore the draft so nothing is silently lost.
       setDraft(key, text);
       reportError(err, 'Prompt not sent');
     } finally {

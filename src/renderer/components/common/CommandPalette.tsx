@@ -1,4 +1,4 @@
-/** ⌘K command/search palette (spec §5.4, §10). */
+/** ⌘K command/search palette. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 

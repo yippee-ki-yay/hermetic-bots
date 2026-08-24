@@ -1,4 +1,4 @@
-/** Application settings (spec §7.6). */
+/** Application settings. */
 import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap, isDemoMode } from '../../app/api';

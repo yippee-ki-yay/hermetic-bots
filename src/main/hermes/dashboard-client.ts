@@ -1,5 +1,5 @@
 /**
- * Hermes Dashboard REST client (spec §12.1–§12.2). All requests go to the
+ * Hermes Dashboard REST client. All requests go to the
  * loopback tunnel endpoint only. Responses are treated as untrusted input:
  * validated leniently, logged sanitized, and normalized before the renderer
  * ever sees them.

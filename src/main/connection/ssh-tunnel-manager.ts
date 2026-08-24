@@ -1,5 +1,5 @@
 /**
- * SSH tunnel manager (spec §9.1, §11.4). The main process owns one OpenSSH
+ * SSH tunnel manager. The main process owns one OpenSSH
  * child process providing a local loopback forward to the remote dashboard.
  *
  * Invariants:
@@ -34,7 +34,7 @@ export interface TunnelEvents {
   exited: (unexpected: boolean) => void;
 }
 
-/** Backoff schedule in seconds (spec §9.1), jittered ±20%. */
+/** Backoff schedule in seconds, jittered ±20%. */
 export const BACKOFF_SCHEDULE_SEC = [1, 2, 4, 8, 15, 30];
 
 export function backoffDelayMs(attempt: number, random: () => number = Math.random): number {
@@ -212,7 +212,7 @@ export class SshTunnelManager extends EventEmitter {
       if (!this.desired) return;
 
       if (kind === 'port-in-use' && portRetries > 0) {
-        // Bind/spawn race (spec §16): retry immediately with another port.
+        // Bind/spawn race: retry immediately with another port.
         log.warn('tunnel', 'local port race; retrying with a new loopback port');
         void this.spawnOnce(portRetries - 1);
         return;
@@ -273,7 +273,7 @@ export class SshTunnelManager extends EventEmitter {
     this.retryAttempt += 1;
     this.retryCount += 1;
     if (this.retryAttempt > 12) {
-      // Retry ceiling (spec §9.1): surface Offline; user can retry manually.
+      // Retry ceiling: surface Offline; user can retry manually.
       this.setStatus('offline');
       return;
     }

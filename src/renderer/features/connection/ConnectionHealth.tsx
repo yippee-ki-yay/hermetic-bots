@@ -1,4 +1,4 @@
-/** Connection Health (spec §7.5): SSH / tunnel / Hermes / gateways / posture. */
+/** Connection Health: SSH / tunnel / Hermes / gateways / posture. */
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
 import { api, unwrap } from '../../app/api';

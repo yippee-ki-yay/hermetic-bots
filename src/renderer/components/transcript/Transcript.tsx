@@ -1,5 +1,5 @@
 /**
- * Transcript work log (spec §7.1): chronological event list with auto-follow
+ * Transcript work log: chronological event list with auto-follow
  * near the bottom, a New output button otherwise, incremental rendering for
  * long sessions, and a restrained live region for completed turns.
  */
@@ -49,7 +49,7 @@ export function Transcript({
     return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Auto-follow only when already near the bottom (spec §7.1).
+  // Auto-follow only when already near the bottom.
   useEffect(() => {
     const el = outerRef.current;
     if (!el) return;

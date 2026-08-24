@@ -1,6 +1,6 @@
 /**
  * Preload bridge. Exposes only the enumerated HermesApi via contextBridge;
- * raw ipcRenderer is never attached to window (spec §11.2/§11.3).
+ * raw ipcRenderer is never attached to window.
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import type { HermesApi } from './api-types';
@@ -109,7 +109,7 @@ const api: HermesApi = {
   },
   onEvent: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, envelope: unknown): void => {
-      // Validate the envelope shape before it reaches app code (spec §14).
+      // Validate the envelope shape before it reaches app code.
       if (
         envelope &&
         typeof envelope === 'object' &&

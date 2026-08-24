@@ -1,5 +1,5 @@
 /**
- * Zod schemas validating every request crossing the IPC boundary (spec §11.2).
+ * Zod schemas validating every request crossing the IPC boundary.
  * The main process rejects anything that fails these before touching state.
  */
 import { z } from 'zod';
@@ -147,6 +147,6 @@ export const avatarSetSchema = z.object({
 
 export const deleteProfileSchema = z.object({
   profileName: profileNameSchema,
-  /** Renderer must pass the exact typed confirmation (spec §9.5). */
+  /** Renderer must pass the exact typed confirmation. */
   confirmation: z.string(),
 });

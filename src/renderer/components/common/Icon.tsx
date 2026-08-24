@@ -1,4 +1,4 @@
-/** Single outline icon family, ~1.75px stroke (spec §8.5). */
+/** Single outline icon family, ~1.75px stroke. */
 interface IconProps {
   name: IconName;
   size?: number;

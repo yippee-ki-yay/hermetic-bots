@@ -1,6 +1,6 @@
 /**
  * Normalizes raw Hermes gateway frames into the versioned TranscriptEvent
- * union the renderer consumes (spec §12.4). Raw payloads never cross the IPC
+ * union the renderer consumes. Raw payloads never cross the IPC
  * boundary; previews are redacted and bounded here.
  *
  * The mapping is deliberately tolerant: field names vary between Hermes

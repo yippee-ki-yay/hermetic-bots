@@ -1,9 +1,9 @@
 /**
- * Hermes TUI gateway WebSocket client (spec §12.3–§12.4). JSON-RPC style
+ * Hermes TUI gateway WebSocket client. JSON-RPC style
  * request/response with strict id correlation and exactly-once resolution,
  * plus a raw upstream event stream handed to the normalizer.
  *
- * The main process owns the single subscription (spec §9.3) so renderer
+ * The main process owns the single subscription so renderer
  * reloads never create duplicate event streams.
  */
 import { EventEmitter } from 'node:events';

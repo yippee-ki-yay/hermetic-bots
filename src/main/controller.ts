@@ -1,6 +1,6 @@
 /**
  * AppController — owns connection lifecycle, Hermes clients, normalized
- * caches, and the single push-event stream to the renderer (spec §14).
+ * caches, and the single push-event stream to the renderer.
  */
 import { Notification, webContents, type BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
@@ -95,7 +95,7 @@ export class AppController {
   private storedIdByGateway = new Map<string, string>();
   private activeSessionId: string | null = null;
   private pendingPrompts = new Map<string, PendingPrompt>();
-  /** Approvals / prompts already answered — exactly-once guard (spec §6.6). */
+  /** Approvals / prompts already answered — exactly-once guard. */
   private answeredRequests = new Set<string>();
   private streamBuffers = new Map<string, { eventId: string; text: string }>();
   /**
@@ -210,7 +210,7 @@ export class AppController {
     await this.tunnel.stop();
     this.lastError = undefined;
 
-    // Host trust check before any tunnel attempt (spec §6.1 step 6–7).
+    // Host trust is confirmed before any tunnel attempt.
     const target =
       stored.authMethod === 'ssh-config-host' && stored.sshConfigHost
         ? null // ssh config aliases resolve inside OpenSSH; rely on its known_hosts flow
@@ -395,7 +395,7 @@ export class AppController {
     }
   }
 
-  /** Sleep/wake and network changes trigger an immediate check (spec §9.1). */
+  /** Sleep/wake and network changes trigger an immediate check. */
   onSystemResume(): void {
     log.info('power', 'system resumed; probing connection');
     void this.healthCheck();
@@ -535,7 +535,7 @@ export class AppController {
       orb: input.orb,
     });
 
-    // Later steps: partial failure keeps the profile (spec §6.4 step 6).
+    // Later steps: partial failure keeps the profile rather than rolling back.
     if (input.soul !== undefined && input.soul.trim() !== '') {
       try {
         await this.rest.setSoul(input.name, input.soul);
@@ -752,7 +752,7 @@ export class AppController {
   }
 
   // -------------------------------------------------------------------------
-  // Prompt lifecycle (spec §9.2)
+  // Prompt lifecycle
 
   async submitPrompt(input: {
     profileName: string;
@@ -967,7 +967,7 @@ export class AppController {
   }
 
   /**
-   * Delivery-unknown reconciliation (spec §9.2): after reconnect, check
+   * Delivery-unknown reconciliation: after reconnect, check
    * history for each unacknowledged prompt; never auto-resubmit.
    */
   private async reconcilePendingPrompts(): Promise<void> {
@@ -1012,7 +1012,7 @@ export class AppController {
   }
 
   // -------------------------------------------------------------------------
-  // Approvals and input requests (exactly once, spec §6.6)
+  // Approvals and input requests (exactly once)
 
   private assertNotAnswered(requestId: string): void {
     if (this.answeredRequests.has(requestId)) {
@@ -1108,7 +1108,7 @@ export class AppController {
   }
 
   private onGatewayClose(): void {
-    // Prompts sent but not acknowledged become delivery-unknown (spec §9.2).
+    // Prompts sent but not acknowledged become delivery-unknown.
     for (const pending of this.pendingPrompts.values()) {
       if (pending.state === 'submitting') {
         pending.state = 'delivery-unknown';
@@ -1286,7 +1286,7 @@ export class AppController {
   }
 
   // -------------------------------------------------------------------------
-  // Messaging / Telegram (spec §6.5, Phase 5)
+  // Messaging / Telegram
 
   async telegramStatus(profileName: string): Promise<TelegramStatus> {
     try {

@@ -1,5 +1,5 @@
 /**
- * Renderer-safe domain contracts (spec §13). Nothing in this file may carry
+ * Renderer-safe domain contracts. Nothing in this file may carry
  * secret material: no tokens, no key paths, no env values, no raw SSH argv.
  */
 import type { PublicError } from './errors';
@@ -53,13 +53,13 @@ export interface ConnectionSummary {
 export interface HostTrustPrompt {
   host: string;
   port: number;
-  /** e.g. "SHA256:AbCd..." — exact fingerprint the user must verify (spec §6.1). */
+  /** e.g. "SHA256:AbCd..." — exact fingerprint the user must verify. */
   fingerprint: string;
   keyType: string;
 }
 
 // ---------------------------------------------------------------------------
-// Capabilities (spec §12.5)
+// Capabilities
 
 export interface Capabilities {
   hermesVersion?: string;
@@ -129,7 +129,7 @@ export interface ThreadSummary {
 }
 
 // ---------------------------------------------------------------------------
-// Transcript events (normalized union, spec §12.4)
+// Transcript events (normalized union)
 
 export type PromptDeliveryState =
   | 'draft'
@@ -397,7 +397,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
 };
 
 // ---------------------------------------------------------------------------
-// Push events main → renderer (single envelope channel, spec §14)
+// Push events main → renderer (single envelope channel)
 
 export type PushEvent =
   | { type: 'connection.state'; connection: ConnectionSummary }
@@ -421,7 +421,7 @@ export interface PushEnvelope {
 }
 
 // ---------------------------------------------------------------------------
-// Initial connection defaults (spec §3 — editable defaults, not policy)
+// Initial connection defaults — editable starting points, not policy
 
 export const CONNECTION_DEFAULTS = {
   label: 'Hermes VPS',

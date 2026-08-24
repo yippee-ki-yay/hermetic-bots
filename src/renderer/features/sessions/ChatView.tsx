@@ -1,5 +1,5 @@
 /** Chat workspace route: transcript + activity strip + composer, and the
- * no-session / disconnected states (spec §7.2). */
+ * no-session / disconnected states. */
 import { useStore } from '../../state/store';
 import { CommandHeader } from '../../components/shell/CommandHeader';
 import { Transcript } from '../../components/transcript/Transcript';

@@ -1,6 +1,6 @@
 /**
  * Bot roster rail: each persona's avatar paired with its name and job title,
- * plus global navigation (spec §7.1, with the expanded-roster layout requested
+ * plus global navigation (with the expanded-roster layout requested
  * for v1 so identity reads at a glance rather than on hover).
  */
 import { useStore } from '../../state/store';

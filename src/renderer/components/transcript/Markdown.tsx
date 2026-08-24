@@ -1,5 +1,5 @@
 /**
- * Safe Markdown renderer (spec §15.3). No HTML parsing, no
+ * Safe Markdown renderer. No HTML parsing, no
  * dangerouslySetInnerHTML anywhere — everything renders as React text nodes,
  * so script injection, inline handlers, iframes, and remote resources are
  * structurally impossible. Links require an explicit click and show their

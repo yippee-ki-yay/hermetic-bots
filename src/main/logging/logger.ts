@@ -1,6 +1,6 @@
 /**
  * Sanitized main-process logger with a bounded ring buffer. Diagnostics
- * (spec §16) include state transitions, endpoint names, statuses, and
+ * include state transitions, endpoint names, statuses, and
  * correlation ids — never message bodies or secrets.
  */
 import { randomUUID } from 'node:crypto';
