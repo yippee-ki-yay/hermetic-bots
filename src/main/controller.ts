@@ -87,8 +87,8 @@ export class AppController {
   private sessionProfile = new Map<string, string>();
   /**
    * Hermes uses two ids per conversation: the durable one REST reports (e.g.
-   * `20260820_174503_01c16a`) and a short in-memory gateway handle minted on
-   * create/resume (e.g. `04b7e762`). The app keys everything by the durable
+   * `20260101_120000_a1b2c3`) and a short in-memory gateway handle minted on
+   * create/resume (e.g. `9f3ac1d0`). The app keys everything by the durable
    * id and translates only when talking to the WebSocket.
    */
   private gatewayIdByStored = new Map<string, string>();
