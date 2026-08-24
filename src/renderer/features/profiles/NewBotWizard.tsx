@@ -16,7 +16,7 @@ import type { CreateBotStepResult, ModelOptions } from '@shared/contracts';
 import type { PublicError } from '@shared/errors';
 import { slugify, uniqueSlug } from '@shared/profile-name';
 
-export function NewBotWizard(_props: { step: number }): React.JSX.Element {
+export function NewBotWizard(): React.JSX.Element {
   const navigate = useStore((s) => s.navigate);
   const bots = useStore((s) => s.bots);
   const toast = useStore((s) => s.toast);

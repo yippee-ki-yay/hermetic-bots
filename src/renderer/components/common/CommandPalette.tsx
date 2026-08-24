@@ -42,7 +42,7 @@ export function CommandPalette(): React.JSX.Element | null {
         kind: 'thread',
         run: () => navigate({ view: 'chat', profile: t.profileName, sessionId: t.id }),
       })),
-      { id: 'act-new-bot', label: 'New bot…', kind: 'action', run: () => navigate({ view: 'wizard', step: 0 }) },
+      { id: 'act-new-bot', label: 'New bot…', kind: 'action', run: () => navigate({ view: 'wizard' }) },
       { id: 'act-conn', label: 'Connection health', kind: 'action', run: () => navigate({ view: 'connection' }) },
       { id: 'act-settings', label: 'Application settings', kind: 'action', run: () => navigate({ view: 'settings' }) },
     ];

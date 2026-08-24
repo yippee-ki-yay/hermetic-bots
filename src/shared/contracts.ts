@@ -425,7 +425,8 @@ export interface PushEnvelope {
 
 export const CONNECTION_DEFAULTS = {
   label: 'Hermes VPS',
-  host: '203.0.113.10',
+  /** Deliberately blank: the server is the operator's to supply on first run. */
+  host: '',
   port: 22,
   user: 'root',
   remoteDashboardHost: '127.0.0.1',

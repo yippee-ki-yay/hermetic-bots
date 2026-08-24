@@ -41,7 +41,7 @@ export function App(): React.JSX.Element {
         state.setPaletteOpen(!state.paletteOpen);
       } else if (e.key === 'n' && e.shiftKey) {
         e.preventDefault();
-        state.navigate({ view: 'wizard', step: 0 });
+        state.navigate({ view: 'wizard' });
       } else if (e.key === 'n') {
         e.preventDefault();
         const r = state.route;
@@ -99,7 +99,7 @@ export function App(): React.JSX.Element {
         break;
       case 'wizard':
         shellClass = 'app-shell no-deck';
-        workspace = <NewBotWizard step={route.step} />;
+        workspace = <NewBotWizard />;
         break;
       case 'connection':
         shellClass = 'app-shell no-deck';

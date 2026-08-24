@@ -24,7 +24,7 @@ export type Route =
   | { view: 'welcome' }
   | { view: 'chat'; profile: string; sessionId: string | null }
   | { view: 'bot-settings'; profile: string; tab: BotTab }
-  | { view: 'wizard'; step: number }
+  | { view: 'wizard' }
   | { view: 'connection' }
   | { view: 'settings' };
 

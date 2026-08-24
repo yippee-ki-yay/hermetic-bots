@@ -80,7 +80,7 @@ export function ConstellationRail(): React.JSX.Element {
             {bot.unreadCount > 0 ? <span className="orb-unread">{bot.unreadCount}</span> : null}
           </button>
         ))}
-        <button className="rail-add" onClick={() => navigate({ view: 'wizard', step: 0 })}>
+        <button className="rail-add" onClick={() => navigate({ view: 'wizard' })}>
           <span className="rail-add-mark" aria-hidden="true">
             <svg
               width="18"

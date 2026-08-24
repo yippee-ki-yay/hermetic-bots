@@ -27,7 +27,7 @@ work log.
 You never open a terminal to talk to your agents, and you never expose a port to
 the internet to make that possible.
 
-- **Every profile is a bot.** Name, role, and a generated crab-in-a-jar avatar —
+- **Every profile is a bot.** Name, job title, and a generated crab-in-a-jar avatar —
   5 jar shapes × 4 eye styles × 2 poses × 10 palettes, so no two look alike. Or
   upload a picture.
 - **A work log, not a chat toy.** Streamed replies, tool calls with expandable
@@ -36,7 +36,7 @@ the internet to make that possible.
 - **Approvals in place.** Approval, clarification, sudo-password, and secret
   requests render as first-class transcript panels. Enter never approves
   anything.
-- **Creating a bot takes two fields.** A name and a role. The Hermes profile id
+- **Creating a bot takes two fields.** A name and a job title. The Hermes profile id
   is derived, the avatar is derived, the model is inherited from whatever the
   server is authenticated for.
 - **258 ready-made personas**, searchable by division, reshaped into the SOUL.md
@@ -64,8 +64,8 @@ running on the server.
 
 ## Install
 
-Requires macOS on Apple silicon, Node 20+, and an SSH key that already reaches
-your VPS.
+Requires macOS on Apple silicon, Node 20+, a Hermes Agent install on a server
+you control, and an SSH key that already reaches it.
 
 ```bash
 npm install
@@ -108,6 +108,10 @@ Hermes adapter, not scattered through the UI.
 It expects a **loopback** dashboard, where the SSH tunnel is the security
 boundary. A gated (OAuth) deployment is detected and reported as unsupported
 rather than half-working.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
 
 ## Credits
 

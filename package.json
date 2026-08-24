@@ -5,8 +5,8 @@
   "description": "Private desktop control room for persistent Hermes Agent personas over an SSH tunnel",
   "main": "out/main/index.js",
   "private": true,
-  "author": "yippee-ki-yay@users.noreply.github.com",
-  "license": "UNLICENSED",
+  "author": "yippee-ki-yay",
+  "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -39,5 +39,9 @@
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
     "vitest": "^4.1.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yippee-ki-yay/hermetic-bots.git"
   }
 }
